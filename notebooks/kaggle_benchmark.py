@@ -964,7 +964,10 @@ def phase6_finetune_trocr():
         def trocr_lora_predict(path):
             image = Image.open(path).convert("RGB")
             pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
-            ids = model.generate(pixel_values, max_new_tokens=MAX_TARGET_LEN)
+            # PeftModelForSeq2SeqLM.generate() CHI nhan keyword arg, khong nhan positional
+            # (khac VisionEncoderDecoderModel.generate() goc dung o Phase 2 - kernel v18: TypeError
+            # "takes 1 positional argument but 2 were given" tren CA 1180/1180 anh, hypothesis rong het).
+            ids = model.generate(pixel_values=pixel_values, max_new_tokens=MAX_TARGET_LEN)
             return processor.batch_decode(ids, skip_special_tokens=True)[0]
 
         rx_test = build_manifest_kaggle_rx("Testing")
