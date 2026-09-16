@@ -1,3 +1,7 @@
+> **⚠️ ĐÃ THAY THẾ (SUPERSEDED) — 16/09/2026.** Sau khi có kết quả Phase 1 thật (`results/phase1_summary.md`), người dùng quyết định nâng mục tiêu lên tạp chí **Q2** thay vì chỉ arXiv/workshop — cần thêm đóng góp phương pháp (LoRA fine-tuning) và mở rộng thời gian lên ~3-4 tuần. Xem kế hoạch hiện tại tại [`05-ke-hoach-Q2.md`](../05-ke-hoach-Q2.md). Giữ lại file này chỉ để tham khảo/đối chiếu — Phase 1-2 mô tả trong này vẫn là nền tảng, không đổi.
+
+---
+
 # 5. Kế Hoạch Nghiên Cứu 2 Tuần (Nghiên Cứu Độc Lập, Dataset Công Khai)
 
 *Bắt đầu 15/09/2026. Mục tiêu: hoàn thành thực nghiệm + bản thảo bài báo (dạng benchmark/technical report ngắn) và nộp arXiv trong 14 ngày — KHÔNG bao gồm thời gian bình duyệt (bình duyệt workshop/hội nghị luôn mất thêm hàng tuần đến hàng tháng, nằm ngoài phạm vi kiểm soát của kế hoạch này).*
