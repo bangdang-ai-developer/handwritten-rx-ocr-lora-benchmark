@@ -509,8 +509,12 @@ def phase3_got_ocr2():
         from transformers import AutoProcessor, AutoModelForImageTextToText
 
         got_processor = AutoProcessor.from_pretrained("stepfun-ai/GOT-OCR-2.0-hf")
+        # QUAN TRONG: T4 (kien truc Turing) KHONG co tensor core ho tro bfloat16 that su -
+        # kernel v8 dung bfloat16 cho ra output hon loan da ngon ngu, hoan toan sai (CER~55-120,
+        # tuc dai gap hang chuc lan tham chieu) - nghi do loi so hoc ngam khi ep bf16 tren phan cung
+        # khong ho tro dung. Doi sang float16 (T4 ho tro tot, Turing co Tensor Core fp16 that).
         got_model = AutoModelForImageTextToText.from_pretrained(
-            "stepfun-ai/GOT-OCR-2.0-hf", dtype=torch.bfloat16 if device == "cuda" else torch.float32
+            "stepfun-ai/GOT-OCR-2.0-hf", dtype=torch.float16 if device == "cuda" else torch.float32
         ).to(device)
         got_model.eval()
 
@@ -523,17 +527,30 @@ def phase3_got_ocr2():
                 do_sample=False,
                 tokenizer=got_processor.tokenizer,
                 stop_strings="<|im_end|>",
-                max_new_tokens=64,
+                max_new_tokens=32,
             )
             text = got_processor.decode(
                 generate_ids[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True
             )
             return text.strip()
 
-        print("\n--- Debug: 5 vi du dau GOT-OCR2.0 tren rx_test ---")
+        print("\n--- Debug: 5 vi du dau GOT-OCR2.0 tren rx_test (dtype=float16) ---")
+        debug_preds = []
         for i in range(min(5, len(rx_test))):
             row = rx_test.iloc[i]
-            print(f"  ref={row['label']!r}  pred={got_predict(row['image_path'])!r}")
+            pred = got_predict(row["image_path"])
+            debug_preds.append(pred)
+            print(f"  ref={row['label']!r}  pred={pred!r}")
+
+        # PHANH KHAN CAP: neu van ra output vo nghia (qua dai / toan ky tu la) nhu kernel v8,
+        # DUNG LAI NGAY thay vi chay het 1180 anh (~90 phut GPU) roi moi phat hien lai sai.
+        avg_len = sum(len(p) for p in debug_preds) / max(1, len(debug_preds))
+        if avg_len > 60:
+            raise RuntimeError(
+                f"GOT-OCR2.0 debug output van qua dai/vo nghia (trung binh {avg_len:.0f} ky tu cho "
+                f"tu 1 chu) - co the van con loi khac ngoai bf16/fp16 (vi du: dinh dang prompt, "
+                f"kich thuoc anh dau vao). DUNG lai, KHONG chay full 1180 anh. Xem debug_preds o tren."
+            )
 
         print("\n--- GOT-OCR2.0 tren Kaggle-Rx (Testing, toan bo) ---")
         run_model_on_manifest("got-ocr2.0", got_predict, rx_test, "kaggle_rx")
