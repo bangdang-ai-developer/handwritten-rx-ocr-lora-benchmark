@@ -36,7 +36,7 @@ import numpy as np
 # ============================================================
 # CAU HINH
 # ============================================================
-CURRENT_PHASE = 2   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
+CURRENT_PHASE = 3   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
 # Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
@@ -492,6 +492,59 @@ def phase2_trocr_donut():
 
 
 # ============================================================
+# PHASE 3 — GOT-OCR2.0 (stepfun-ai, ~580M, VLM chuyen OCR the he moi)
+# ============================================================
+def phase3_got_ocr2():
+    _pip_install("transformers", "accelerate")
+    import torch
+    from PIL import Image
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"  device = {device}")
+
+    rx_test = build_manifest_kaggle_rx("Testing")
+    iam_sub = build_manifest_iam(n_sample=400)
+
+    try:
+        from transformers import AutoProcessor, AutoModelForImageTextToText
+
+        got_processor = AutoProcessor.from_pretrained("stepfun-ai/GOT-OCR-2.0-hf")
+        got_model = AutoModelForImageTextToText.from_pretrained(
+            "stepfun-ai/GOT-OCR-2.0-hf", dtype=torch.bfloat16 if device == "cuda" else torch.float32
+        ).to(device)
+        got_model.eval()
+
+        @torch.no_grad()
+        def got_predict(path):
+            image = Image.open(path).convert("RGB")
+            inputs = got_processor(image, return_tensors="pt").to(device)
+            generate_ids = got_model.generate(
+                **inputs,
+                do_sample=False,
+                tokenizer=got_processor.tokenizer,
+                stop_strings="<|im_end|>",
+                max_new_tokens=64,
+            )
+            text = got_processor.decode(
+                generate_ids[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True
+            )
+            return text.strip()
+
+        print("\n--- Debug: 5 vi du dau GOT-OCR2.0 tren rx_test ---")
+        for i in range(min(5, len(rx_test))):
+            row = rx_test.iloc[i]
+            print(f"  ref={row['label']!r}  pred={got_predict(row['image_path'])!r}")
+
+        print("\n--- GOT-OCR2.0 tren Kaggle-Rx (Testing, toan bo) ---")
+        run_model_on_manifest("got-ocr2.0", got_predict, rx_test, "kaggle_rx")
+        print("\n--- GOT-OCR2.0 tren IAM (subsample 400) ---")
+        run_model_on_manifest("got-ocr2.0", got_predict, iam_sub, "iam")
+    except Exception as e:
+        print(f"  [LOI GOT-OCR2.0, bo qua model nay]: {e}")
+        traceback.print_exc()
+
+
+# ============================================================
 # MAIN
 # ============================================================
 if __name__ == "__main__":
@@ -504,7 +557,9 @@ if __name__ == "__main__":
         phase1_classical_ocr()
     elif CURRENT_PHASE == 2:
         phase2_trocr_donut()
-    elif CURRENT_PHASE >= 3:
-        print(f"PHASE {CURRENT_PHASE} (GOT-OCR2.0/PaddleOCR-VL/Qwen-VL) chua duoc them vao "
-              "script nay — se bo sung sau khi xac nhan PHASE 2 chay dung. Xem "
-              "docs/05-ke-hoach-2-tuan.md muc 2.3 cho danh sach lenh cai dat cua tung model.")
+    elif CURRENT_PHASE == 3:
+        phase3_got_ocr2()
+    elif CURRENT_PHASE >= 4:
+        print(f"PHASE {CURRENT_PHASE} (PaddleOCR-VL/Qwen-VL) chua duoc them vao "
+              "script nay — se bo sung sau khi xac nhan PHASE 3 chay dung. Xem "
+              "docs/05-ke-hoach-Q2.md cho danh sach lenh cai dat cua tung model.")
