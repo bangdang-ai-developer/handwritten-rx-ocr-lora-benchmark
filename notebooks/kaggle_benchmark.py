@@ -495,7 +495,14 @@ def phase2_trocr_donut():
 # PHASE 3 — GOT-OCR2.0 (stepfun-ai, ~580M, VLM chuyen OCR the he moi)
 # ============================================================
 def phase3_got_ocr2():
-    _pip_install("transformers", "accelerate")
+    # QUAN TRONG (kernel v10): transformers moi nhat tu pip la 5.0.0 (major version rat moi,
+    # 09/2026). GOT-OCR2.0 duoc merge vao transformers ngay 2025-01-31 (PR #34721), on dinh
+    # qua nhieu ban 4.x (~4.57.0) nhung CHUA chac tuong thich voi buoc nhay major 5.0.0 (co the
+    # co breaking change noi bo ve generate()/cache lam hong modeling_got_ocr2.py). Prompt/anh
+    # da xac nhan dung (kernel v10: input_ids co dung token <img>...OCR:..., pixel_values dung
+    # shape) nhung output van hoan toan vo nghia -> ghim lai ban 4.57.0 (on dinh, sau khi model
+    # nay duoc merge, truoc buoc nhay v5) thay vi de pip tu chon ban moi nhat.
+    _pip_install("transformers==4.57.0", "accelerate")
     import torch
     from PIL import Image
 
