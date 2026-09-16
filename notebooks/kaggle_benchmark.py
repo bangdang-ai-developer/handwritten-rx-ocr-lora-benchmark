@@ -851,6 +851,14 @@ def phase6_finetune_trocr():
         bias="none", task_type="SEQ_2_SEQ_LM",
     )
     model = get_peft_model(base_model, lora_config).to(device)
+    # Fix loi tuong thich peft<->VisionEncoderDecoderConfig (kernel v16: AttributeError khi
+    # save_pretrained/checkpoint - peft co buoc kiem tra "vocab_size resize" bang cach load lai
+    # AutoConfig.from_pretrained(model_id).vocab_size, nhung VisionEncoderDecoderConfig (kien
+    # truc composite encoder/decoder rieng) khong co thuoc tinh vocab_size o cap top-level nay.
+    # Dat base_model_name_or_path=None de peft BO QUA hoan toan buoc kiem tra nay (an toan vi
+    # ta khong resize embedding).
+    for _adapter_name in model.peft_config:
+        model.peft_config[_adapter_name].base_model_name_or_path = None
     model.print_trainable_parameters()
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     if n_trainable == 0:
