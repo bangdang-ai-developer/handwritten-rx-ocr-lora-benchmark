@@ -2,6 +2,8 @@
 
 *Xây dựng dựa trên: `docs/05-ke-hoach-2-tuan.md` (kế hoạch gốc), `docs/04-dataset-y-khoa-cong-khai.md`, kết quả thật Phase 1 (`results/phase1_summary.md`, `results/results_master_phase1.csv`), code Phase 2 đang chạy (`notebooks/kaggle_benchmark.py`), và 2 khối nghiên cứu xác minh đã cung cấp (Scimago + khả thi LoRA).*
 
+> **⚠️ CẬP NHẬT SỐ LIỆU (Phase 6, 16/09/2026):** Đã tải dataset về máy và đếm trực tiếp — số liệu "2.808/936/936" (suy ra từ mô tả "60/20/20" trên trang Kaggle) trong toàn bộ tài liệu dưới đây **KHÔNG ĐÚNG với thực tế**. Số ảnh thật: **Training = 3.120, Validation = 780, Testing = 780** (tổng 4.680, khớp). Đây **không phải lỗi path-resolution** như suy đoán ban đầu — code đã resolve đúng 100% (780/780, 3120/3120) từ lúc đầu; chỉ là mô tả "60/20/20" trên trang Kaggle không khớp tỷ lệ chia thật (~66.7/16.65/16.65). Mọi con số "2.808 ảnh train"/"936 ảnh test" ở các mục bên dưới nên đọc là **3.120 ảnh train / 780 ảnh test** — xem `results/phase6_summary.md` để biết chi tiết đầy đủ.
+
 Đã kiểm tra lại repo trước khi viết báo cáo này: Phase 1 (Tesseract, EasyOCR) đã xong thật với dữ liệu **780 ảnh** kaggle_rx (không phải 936 như tính toán lý thuyết 20%×4680 — có lệch do một số ảnh không resolve được đường dẫn trong `build_manifest_kaggle_rx()`, xem Rủi ro ở Mục 6) + 400 ảnh IAM. Phase 2 (TrOCR-large-handwritten + Donut-base zero-shot) vừa được thêm vào code (`notebooks/kaggle_benchmark.py`, `CURRENT_PHASE = 2`), đang/sắp chạy trên Kaggle. Dataset Kaggle-Rx có cấu trúc thật là 3 thư mục `Training/Testing/Validation` (60/20/20 stratified theo 78 lớp) với file nhãn CSV/XLSX riêng mỗi thư mục — tương ứng train ≈ 2.808 ảnh, validation ≈ 936 ảnh, test ≈ 936 ảnh (khớp con số 2.808 mà bạn nêu).
 
 ---
