@@ -27,6 +27,20 @@ import os, glob, json, time, traceback, subprocess, sys
 def _pip_install(*pkgs):
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", *pkgs], check=False)
 
+
+def _assert_sane_debug_output(model_name, debug_preds, max_avg_len=60):
+    """PHANH KHAN CAP dung chung cho moi VLM moi: neu debug 5 anh dau ra output qua dai/vo
+    nghia (dau hieu hallucination/dtype-sai/thu vien khong tuong thich - xem bai hoc GOT-OCR2.0
+    kernel v8-v10, ~90 phut GPU bi lang phi truoc khi phat hien), DUNG LAI truoc khi chay full
+    1180 anh. Goi ngay sau vong debug, truoc khi vao run_model_on_manifest."""
+    avg_len = sum(len(p) for p in debug_preds) / max(1, len(debug_preds))
+    if avg_len > max_avg_len:
+        raise RuntimeError(
+            f"{model_name}: debug output qua dai/vo nghia (trung binh {avg_len:.0f} ky tu cho "
+            f"1 tu/nhan ngan) - nghi loi dtype/thu vien/prompt, xem chi tiet debug_preds o tren. "
+            f"DUNG LAI, KHONG chay full 1180 anh."
+        )
+
 _pip_install("jiwer", "rapidfuzz", "openpyxl", "pytesseract", "easyocr")
 os.system("apt-get install -y tesseract-ocr -q > /tmp/apt.log 2>&1")  # Kaggle kernel chay quyen root
 
@@ -36,7 +50,7 @@ import numpy as np
 # ============================================================
 # CAU HINH
 # ============================================================
-CURRENT_PHASE = 3   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
+CURRENT_PHASE = 4   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
 # Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
@@ -564,15 +578,7 @@ def phase3_got_ocr2():
             debug_preds.append(pred)
             print(f"  ref={row['label']!r}  pred={pred!r}")
 
-        # PHANH KHAN CAP: neu van ra output vo nghia (qua dai / toan ky tu la) nhu kernel v8,
-        # DUNG LAI NGAY thay vi chay het 1180 anh (~90 phut GPU) roi moi phat hien lai sai.
-        avg_len = sum(len(p) for p in debug_preds) / max(1, len(debug_preds))
-        if avg_len > 60:
-            raise RuntimeError(
-                f"GOT-OCR2.0 debug output van qua dai/vo nghia (trung binh {avg_len:.0f} ky tu cho "
-                f"tu 1 chu) - co the van con loi khac ngoai bf16/fp16 (vi du: dinh dang prompt, "
-                f"kich thuoc anh dau vao). DUNG lai, KHONG chay full 1180 anh. Xem debug_preds o tren."
-            )
+        _assert_sane_debug_output("GOT-OCR2.0", debug_preds)
 
         print("\n--- GOT-OCR2.0 tren Kaggle-Rx (Testing, toan bo) ---")
         run_model_on_manifest("got-ocr2.0", got_predict, rx_test, "kaggle_rx")
@@ -580,6 +586,69 @@ def phase3_got_ocr2():
         run_model_on_manifest("got-ocr2.0", got_predict, iam_sub, "iam")
     except Exception as e:
         print(f"  [LOI GOT-OCR2.0, bo qua model nay]: {e}")
+        traceback.print_exc()
+
+
+# ============================================================
+# PHASE 4 — PaddleOCR-VL (0.9B, element-level recognition qua transformers)
+# ============================================================
+def phase4_paddleocr_vl():
+    # Bai hoc tu Phase 3 (GOT-OCR2.0): (1) ghim version thay vi de pip tu chon moi nhat,
+    # (2) dung float16 thay bfloat16 tren T4/Turing (khong co tensor core bf16 that),
+    # (3) luon debug 5 anh + _assert_sane_debug_output truoc khi chay full 1180 anh.
+    _pip_install("transformers==4.57.0", "accelerate")
+    import torch
+    from PIL import Image
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"  device = {device}")
+
+    rx_test = build_manifest_kaggle_rx("Testing")
+    iam_sub = build_manifest_iam(n_sample=400)
+
+    try:
+        from transformers import AutoModelForCausalLM, AutoProcessor
+
+        model_path = "PaddlePaddle/PaddleOCR-VL"
+        pvl_model = AutoModelForCausalLM.from_pretrained(
+            model_path, trust_remote_code=True,
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+        ).to(device).eval()
+        pvl_processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+
+        @torch.no_grad()
+        def pvl_predict(path):
+            image = Image.open(path).convert("RGB")
+            messages = [{"role": "user", "content": [
+                {"type": "image", "image": image},
+                {"type": "text", "text": "OCR:"},
+            ]}]
+            inputs = pvl_processor.apply_chat_template(
+                messages, tokenize=True, add_generation_prompt=True,
+                return_dict=True, return_tensors="pt",
+            ).to(device)
+            outputs = pvl_model.generate(**inputs, max_new_tokens=32)
+            text = pvl_processor.batch_decode(
+                outputs[:, inputs["input_ids"].shape[1]:], skip_special_tokens=True
+            )[0]
+            return text.strip()
+
+        print("\n--- Debug: 5 vi du dau PaddleOCR-VL tren rx_test ---")
+        debug_preds = []
+        for i in range(min(5, len(rx_test))):
+            row = rx_test.iloc[i]
+            pred = pvl_predict(row["image_path"])
+            debug_preds.append(pred)
+            print(f"  ref={row['label']!r}  pred={pred!r}")
+
+        _assert_sane_debug_output("PaddleOCR-VL", debug_preds)
+
+        print("\n--- PaddleOCR-VL tren Kaggle-Rx (Testing, toan bo) ---")
+        run_model_on_manifest("paddleocr-vl", pvl_predict, rx_test, "kaggle_rx")
+        print("\n--- PaddleOCR-VL tren IAM (subsample 400) ---")
+        run_model_on_manifest("paddleocr-vl", pvl_predict, iam_sub, "iam")
+    except Exception as e:
+        print(f"  [LOI PaddleOCR-VL, bo qua model nay]: {e}")
         traceback.print_exc()
 
 
@@ -598,7 +667,9 @@ if __name__ == "__main__":
         phase2_trocr_donut()
     elif CURRENT_PHASE == 3:
         phase3_got_ocr2()
-    elif CURRENT_PHASE >= 4:
-        print(f"PHASE {CURRENT_PHASE} (PaddleOCR-VL/Qwen-VL) chua duoc them vao "
-              "script nay — se bo sung sau khi xac nhan PHASE 3 chay dung. Xem "
-              "docs/05-ke-hoach-Q2.md cho danh sach lenh cai dat cua tung model.")
+    elif CURRENT_PHASE == 4:
+        phase4_paddleocr_vl()
+    elif CURRENT_PHASE >= 5:
+        print(f"PHASE {CURRENT_PHASE} (Qwen-VL) chua duoc them vao script nay — se bo sung "
+              "sau khi xac nhan PHASE 4 chay dung. Xem docs/05-ke-hoach-Q2.md cho danh sach "
+              "lenh cai dat cua tung model.")
