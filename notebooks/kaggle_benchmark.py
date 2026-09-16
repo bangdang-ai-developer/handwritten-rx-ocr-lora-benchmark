@@ -744,7 +744,10 @@ def phase5_qwen_vl():
 # goi lai dung ham nay voi cung seed la tai tao dung tap test cu.
 # ============================================================
 def phase6_finetune_trocr():
-    _pip_install("transformers==4.57.0", "accelerate", "peft", "albumentations", "opencv-python-headless")
+    # torchao>=0.16.0 bat buoc: Kaggle base image co san torchao==0.10.0 (cu), peft moi nhat
+    # tu choi chay voi ban cu (kernel v14: ImportError). Ep nang cap torchao cung luc.
+    _pip_install("transformers==4.57.0", "accelerate", "peft", "torchao>=0.16.0",
+                 "albumentations", "opencv-python-headless")
     import torch
     from PIL import Image
     import albumentations as A
