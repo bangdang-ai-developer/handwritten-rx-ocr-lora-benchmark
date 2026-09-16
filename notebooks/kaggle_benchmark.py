@@ -785,10 +785,21 @@ def phase6_finetune_trocr():
     print(f"  train_df={len(train_df)}, val_df_full={len(val_df_full)}, val_df (subsample theo doi)={len(val_df)}")
 
     from transformers import (
-        TrOCRProcessor, VisionEncoderDecoderModel, Seq2SeqTrainer, Seq2SeqTrainingArguments,
-        EarlyStoppingCallback, TrainerCallback,
+        TrOCRProcessor, VisionEncoderDecoderModel, VisionEncoderDecoderConfig,
+        Seq2SeqTrainer, Seq2SeqTrainingArguments, EarlyStoppingCallback, TrainerCallback,
     )
     from peft import LoraConfig, get_peft_model
+
+    # FIX GOC (kernel v16-v17: 'VisionEncoderDecoderConfig' object has no attribute 'vocab_size',
+    # lap lai o MOI checkpoint save, khong chi lan dau): peft.get_peft_model_state_dict() kiem
+    # tra "co resize embedding khong" bang cach doc model.config.__class__.from_pretrained(id)
+    # .vocab_size tren MOT INSTANCE CONFIG MOI TAI TU DAU moi lan save - dat thuoc tinh instance
+    # (nhu da lam ben duoi) chi fix duoc instance hien tai, khong fix duoc instance moi nay.
+    # Patch THEM property vocab_size vao chinh CLASS VisionEncoderDecoderConfig (delegate sang
+    # decoder.vocab_size) de MOI instance, ke ca instance tai moi trong peft, deu co san.
+    if not hasattr(VisionEncoderDecoderConfig, "_vocab_size_patched_for_peft"):
+        VisionEncoderDecoderConfig.vocab_size = property(lambda self: self.decoder.vocab_size)
+        VisionEncoderDecoderConfig._vocab_size_patched_for_peft = True
 
     processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
     base_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
@@ -799,7 +810,8 @@ def phase6_finetune_trocr():
     base_model.config.decoder_start_token_id = processor.tokenizer.cls_token_id
     base_model.config.pad_token_id = processor.tokenizer.pad_token_id
     base_model.config.eos_token_id = processor.tokenizer.sep_token_id
-    base_model.config.vocab_size = base_model.config.decoder.vocab_size
+    # KHONG gan base_model.config.vocab_size = ... nua - vocab_size gio la property CAP CLASS
+    # (patch o tren), gan truc tiep vao instance se bi AttributeError: can't set attribute.
     MAX_TARGET_LEN = 32
 
     class RxTorchDataset(torch.utils.data.Dataset):
