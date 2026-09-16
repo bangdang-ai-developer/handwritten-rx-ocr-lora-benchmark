@@ -300,10 +300,12 @@ def build_manifest_iam(n_sample=400):
             if line.startswith("#") or not line.strip():
                 continue
             parts = line.strip().split(" ")
+            if len(parts) < 9:
+                continue  # dong khong du 9 truong theo dinh dang chuan IAM - bo qua, khong crash
             word_id, status, transcription = parts[0], parts[1], parts[-1]
             if status == "ok":
                 parsed.append((word_id, transcription))
-    print(f"  words.txt: {len(parsed)}/{len(parsed)} dong 'ok' (truoc khi sample)")
+    print(f"  words.txt: {len(parsed)} dong 'ok' hop le (truoc khi sample)")
 
     rng = np.random.default_rng(SEED)
     if n_sample and n_sample < len(parsed):
