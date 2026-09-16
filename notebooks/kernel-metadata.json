@@ -1,0 +1,19 @@
+{
+  "id": "dangbang1/ocr-med-benchmark-phase1",
+  "title": "OCR Med Benchmark Phase1",
+  "code_file": "kaggle_benchmark.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "machine_shape": "",
+  "dataset_sources": [
+    "mamun1113/doctors-handwritten-prescription-bd-dataset",
+    "nibinv23/iam-handwriting-word-database"
+  ],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

@@ -20,22 +20,44 @@ ten cot dung voi thuc te truoc khi chay PHASE 1+ (bo du lieu nay co CSV
 nen code o day tu-do-doan qua heuristic va IN RA de ban kiem tra).
 """
 
-import os, glob, json, time, traceback
+import os, glob, json, time, traceback, subprocess, sys
+
+# Bootstrap: cai cac goi khong co san trong Kaggle base image, TRUOC khi import.
+# Chay 1 lan/session (Kaggle giu pip cache trong session nen lan sau nhanh hon).
+def _pip_install(*pkgs):
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", *pkgs], check=False)
+
+_pip_install("jiwer", "rapidfuzz", "openpyxl", "pytesseract", "easyocr")
+os.system("apt-get install -y tesseract-ocr -q > /tmp/apt.log 2>&1")  # Kaggle kernel chay quyen root
+
 import pandas as pd
 import numpy as np
 
 # ============================================================
 # CAU HINH
 # ============================================================
-CURRENT_PHASE = 0   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
+CURRENT_PHASE = 1   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
 RESULTS_DIR = "/kaggle/working/results"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 RESULTS_CSV = f"{RESULTS_DIR}/results_master.csv"
 
-RX_ROOT = "/kaggle/input/doctors-handwritten-prescription-bd-dataset"
-IAM_ROOT = "/kaggle/input/iam-handwriting-word-database"
+def _resolve_root(slug, owner):
+    """Kaggle's newer container mounts datasets under /kaggle/input/datasets/<owner>/<slug>/
+    instead of the classic flat /kaggle/input/<slug>/ - xac nhan qua chay thuc te 16/09/2026
+    (os.listdir('/kaggle/input') = ['datasets']). Thu ca 2 kieu, uu tien kieu moi truoc."""
+    for cand in [
+        f"/kaggle/input/datasets/{owner}/{slug}",
+        f"/kaggle/input/{slug}",
+    ]:
+        if os.path.isdir(cand):
+            return cand
+    return f"/kaggle/input/{slug}"  # fallback de bao loi ro rang o phase0_diagnose
+
+
+RX_ROOT = _resolve_root("doctors-handwritten-prescription-bd-dataset", "mamun1113")
+IAM_ROOT = _resolve_root("iam-handwriting-word-database", "nibinv23")
 
 DRUG_VOCAB = [
     "Beklo", "Maxima", "Leptic", "Esoral", "Omastin", "Esonix", "Canazole", "Fixal",
@@ -54,6 +76,15 @@ DRUG_VOCAB = [
 SEED = 42
 np.random.seed(SEED)
 
+
+def _find_iam_words_txt():
+    """words.txt xac nhan nam tai IAM_ROOT/iam_words/words.txt (kernel v3 log, 16/09/2026).
+    Thu duong dan biet truoc TRUOC, chi recursive-glob (cham, quet ~115K anh) khi that su can."""
+    direct = f"{IAM_ROOT}/iam_words/words.txt"
+    if os.path.exists(direct):
+        return [direct]
+    return glob.glob(f"{IAM_ROOT}/**/words.txt", recursive=True)
+
 # ============================================================
 # PHASE 0 — CHAN DOAN CAU TRUC DU LIEU (chay truoc tien, luon chay)
 # ============================================================
@@ -61,6 +92,13 @@ def phase0_diagnose():
     print("=" * 70)
     print("PHASE 0: Kiem tra cau truc /kaggle/input/")
     print("=" * 70)
+    print("os.listdir('/kaggle/input') =", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "KHONG CO THU MUC /kaggle/input")
+    if os.path.isdir("/kaggle/input/datasets"):
+        for owner in os.listdir("/kaggle/input/datasets"):
+            owner_path = f"/kaggle/input/datasets/{owner}"
+            print(f"  /kaggle/input/datasets/{owner}/ ->", os.listdir(owner_path) if os.path.isdir(owner_path) else "?")
+    print(f"RX_ROOT da resolve = {RX_ROOT}  (ton tai: {os.path.isdir(RX_ROOT)})")
+    print(f"IAM_ROOT da resolve = {IAM_ROOT}  (ton tai: {os.path.isdir(IAM_ROOT)})")
     for root in [RX_ROOT, IAM_ROOT]:
         print(f"\n--- {root} ---")
         if not os.path.isdir(root):
@@ -68,8 +106,8 @@ def phase0_diagnose():
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             depth = dirpath.replace(root, "").count(os.sep)
-            if depth > 2:
-                continue
+            if depth >= 2:
+                dirnames[:] = []  # dung khong de os.walk lan sau vao (IAM co ~115K anh, rat cham neu khong prune)
             print(f"  {dirpath}/  ({len(filenames)} files, {len(dirnames)} subdirs)")
             for fn in filenames[:5]:
                 print(f"      - {fn}")
@@ -85,7 +123,7 @@ def phase0_diagnose():
             print("  LOI DOC FILE:", e)
 
     print("\n--- Doc thu words.txt cua IAM (dinh dang chuan: word_id status graylevel x y w h tag transcription) ---")
-    for path in glob.glob(f"{IAM_ROOT}/**/words.txt", recursive=True)[:1]:
+    for path in _find_iam_words_txt()[:1]:
         print(f"  File: {path}")
         with open(path, encoding="utf-8", errors="replace") as f:
             lines = [l for l in f.readlines() if not l.startswith("#")]
@@ -207,16 +245,22 @@ def run_model_on_manifest(model_name, predict_fn, manifest_df, dataset_name, bat
 # BUILD MANIFEST — tu-nhan-dien cot anh/nhan, khong can biet truoc ten cot
 # ============================================================
 def build_manifest_kaggle_rx(split_dirname_prefix, n_sample=None):
-    """split_dirname_prefix: 'Testing', 'Training', hoac 'Validation'."""
-    label_files = glob.glob(f"{RX_ROOT}/{split_dirname_prefix}/*.csv") + \
-                  glob.glob(f"{RX_ROOT}/{split_dirname_prefix}/*.xlsx")
+    """split_dirname_prefix: 'Testing', 'Training', hoac 'Validation'.
+    Dataset that long them 1 cap thu muc trung gian ten theo tieu de dataset
+    (vi du '.../Doctor's Handwritten Prescription BD dataset/Testing/...') -
+    xac nhan qua chay thuc te 16/09/2026 (kernel v3 log) - nen tim de quy thay vi
+    gia dinh Testing/Training/Validation nam ngay duoi RX_ROOT."""
+    label_files = glob.glob(f"{RX_ROOT}/**/{split_dirname_prefix}/*.csv", recursive=True) + \
+                  glob.glob(f"{RX_ROOT}/**/{split_dirname_prefix}/*.xlsx", recursive=True)
     if not label_files:
-        raise FileNotFoundError(f"Khong tim thay label file trong {RX_ROOT}/{split_dirname_prefix}/")
+        raise FileNotFoundError(f"Khong tim thay label file duoi {RX_ROOT}/**/{split_dirname_prefix}/")
     path = label_files[0]
     df = pd.read_csv(path) if path.endswith(".csv") else pd.read_excel(path)
     img_col, label_col = guess_image_and_label_columns(df, DRUG_VOCAB)
-    img_dir_candidates = glob.glob(f"{RX_ROOT}/{split_dirname_prefix}/*/")
-    img_dir = img_dir_candidates[0] if img_dir_candidates else f"{RX_ROOT}/{split_dirname_prefix}/"
+    split_dir = os.path.dirname(path)  # thu muc Testing/Training/Validation thuc te
+    img_dir_candidates = [d for d in glob.glob(f"{split_dir}/*/") if os.path.isdir(d)]
+    img_dir = img_dir_candidates[0] if img_dir_candidates else split_dir
+    print(f"  split_dir={split_dir!r}, img_dir={img_dir!r}")
 
     def resolve_path(fname):
         fname = str(fname).strip()
@@ -239,30 +283,46 @@ def build_manifest_kaggle_rx(split_dirname_prefix, n_sample=None):
 
 def build_manifest_iam(n_sample=400):
     """Doc words.txt chuan IAM: word_id status graylevel x y w h tag transcription.
-    word_id dang a01-000u-00-00 -> anh tai a01/a01-000u/a01-000u-00-00.png"""
-    words_txt = glob.glob(f"{IAM_ROOT}/**/words.txt", recursive=True)
+    word_id dang a01-000u-00-00 -> anh tai IAM_ROOT/iam_words/words/a01/a01-000u/a01-000u-00-00.png
+    (cau truc xac nhan qua kernel v3 log, 16/09/2026).
+
+    QUAN TRONG VE HIEU NANG: parse+sample TRUOC, chi dung cho o dia (os.path.exists/glob)
+    SAU KHI da sample xuong n_sample dong — words.txt co 44.565 dong, neu glob cho tung
+    dong roi moi sample thi se cham (44K recursive glob) trong khi ta chi can vai tram anh."""
+    words_txt = _find_iam_words_txt()
     if not words_txt:
         raise FileNotFoundError(f"Khong tim thay words.txt trong {IAM_ROOT}")
-    rows = []
+    words_dir = f"{IAM_ROOT}/iam_words/words"  # fallback: do tim neu cau truc khac
+
+    parsed = []
     with open(words_txt[0], encoding="utf-8", errors="replace") as f:
         for line in f:
             if line.startswith("#") or not line.strip():
                 continue
             parts = line.strip().split(" ")
-            word_id, status = parts[0], parts[1]
-            transcription = parts[-1]
-            if status != "ok":
-                continue  # bo qua cac anh IAM tu danh dau segmentation loi
-            a, b = word_id.split("-")[0], "-".join(word_id.split("-")[:2])
-            candidates = glob.glob(f"{IAM_ROOT}/**/{a}/{b}/{word_id}.png", recursive=True)
-            if not candidates:
-                candidates = glob.glob(f"{IAM_ROOT}/**/{word_id}.png", recursive=True)
-            if candidates:
-                rows.append({"image_path": candidates[0], "label": transcription})
+            word_id, status, transcription = parts[0], parts[1], parts[-1]
+            if status == "ok":
+                parsed.append((word_id, transcription))
+    print(f"  words.txt: {len(parsed)}/{len(parsed)} dong 'ok' (truoc khi sample)")
+
+    rng = np.random.default_rng(SEED)
+    if n_sample and n_sample < len(parsed):
+        idx = rng.choice(len(parsed), size=n_sample, replace=False)
+        parsed = [parsed[i] for i in idx]
+
+    rows = []
+    for word_id, transcription in parsed:
+        a, b = word_id.split("-")[0], "-".join(word_id.split("-")[:2])
+        direct = f"{words_dir}/{a}/{b}/{word_id}.png"
+        if os.path.exists(direct):
+            path = direct
+        else:
+            hits = glob.glob(f"{IAM_ROOT}/**/{word_id}.png", recursive=True)  # fallback hiem gap, cham
+            path = hits[0] if hits else None
+        if path:
+            rows.append({"image_path": path, "label": transcription})
     manifest = pd.DataFrame(rows)
-    print(f"  build_manifest_iam: {len(manifest)} anh 'ok' tim duoc tren dia")
-    if n_sample and n_sample < len(manifest):
-        manifest = manifest.sample(n=n_sample, random_state=SEED).reset_index(drop=True)
+    print(f"  build_manifest_iam: {len(manifest)}/{len(parsed)} anh da sample tim duoc tren dia")
     return manifest
 
 
@@ -305,8 +365,8 @@ def phase1_classical_ocr():
 # MAIN
 # ============================================================
 if __name__ == "__main__":
+    phase0_diagnose()  # luon chay truoc de co log cau truc du lieu, du CURRENT_PHASE la gi
     if CURRENT_PHASE == 0:
-        phase0_diagnose()
         print("\n>>> Doc ky output tren. Neu image_col/label_col doan sai (xem dong "
               "'-> Doan: image_col=...'), sua ham guess_image_and_label_columns() "
               "hoac gan cung truc tiep, roi chuyen CURRENT_PHASE=1 va chay lai.")
