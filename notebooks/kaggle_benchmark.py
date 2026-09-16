@@ -39,6 +39,10 @@ import numpy as np
 CURRENT_PHASE = 2   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
+# Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
+RUN_TROCR = False           # da co ket qua tot o results_master_phase2.csv (kernel v6) - khong can chay lai
+RUN_DONUT_RAW_FULL = False  # da co ket qua (that bai gan 100%) o kernel v6 - chi chay lai PADDED lan nay
+
 RESULTS_DIR = "/kaggle/working/results"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 RESULTS_CSV = f"{RESULTS_DIR}/results_master.csv"
@@ -378,32 +382,42 @@ def phase2_trocr_donut():
     iam_sub = build_manifest_iam(n_sample=400)
 
     # --- TrOCR ---
-    try:
-        from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+    if not RUN_TROCR:
+        print("  RUN_TROCR=False - bo qua (da co ket qua tot tu lan chay truoc, xem results_master_phase2.csv)")
+    else:
+        try:
+            from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
-        trocr_processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
-        trocr_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten").to(device)
-        trocr_model.eval()
+            trocr_processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
+            trocr_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten").to(device)
+            trocr_model.eval()
 
-        @torch.no_grad()
-        def trocr_predict(path):
-            image = Image.open(path).convert("RGB")
-            pixel_values = trocr_processor(images=image, return_tensors="pt").pixel_values.to(device)
-            ids = trocr_model.generate(pixel_values, max_new_tokens=32)
-            return trocr_processor.batch_decode(ids, skip_special_tokens=True)[0]
+            @torch.no_grad()
+            def trocr_predict(path):
+                image = Image.open(path).convert("RGB")
+                pixel_values = trocr_processor(images=image, return_tensors="pt").pixel_values.to(device)
+                ids = trocr_model.generate(pixel_values, max_new_tokens=32)
+                return trocr_processor.batch_decode(ids, skip_special_tokens=True)[0]
 
-        print("\n--- TrOCR-large-handwritten tren Kaggle-Rx (Testing, toan bo) ---")
-        run_model_on_manifest("trocr-large-handwritten", trocr_predict, rx_test, "kaggle_rx")
-        print("\n--- TrOCR-large-handwritten tren IAM (subsample 400) ---")
-        run_model_on_manifest("trocr-large-handwritten", trocr_predict, iam_sub, "iam")
-        del trocr_model
-        torch.cuda.empty_cache() if device == "cuda" else None
-    except Exception as e:
-        print(f"  [LOI TrOCR, bo qua model nay]: {e}")
-        traceback.print_exc()
+            print("\n--- TrOCR-large-handwritten tren Kaggle-Rx (Testing, toan bo) ---")
+            run_model_on_manifest("trocr-large-handwritten", trocr_predict, rx_test, "kaggle_rx")
+            print("\n--- TrOCR-large-handwritten tren IAM (subsample 400) ---")
+            run_model_on_manifest("trocr-large-handwritten", trocr_predict, iam_sub, "iam")
+            del trocr_model
+            torch.cuda.empty_cache() if device == "cuda" else None
+        except Exception as e:
+            print(f"  [LOI TrOCR, bo qua model nay]: {e}")
+            traceback.print_exc()
 
     # --- Donut-base (zero-shot doc-reading qua task prompt <s_synthdog>, KHONG dung ban fine-tune CORD -
     #     ban CORD la trich xuat truong hoa don, khac muc tieu free-text OCR o day) ---
+    #
+    # PHAT HIEN (kernel v6, 16/09/2026): cach dung "chuan" (crop nho dua thang vao processor)
+    # cho ra hypothesis RONG ~100% (degenerate_rate ~1.0 ca 2 dataset). Gia thuyet: donut-base
+    # (chi pretrain SynthDoG, CHUA fine-tune) duoc train tren anh trang tai lieu day du (page-shaped,
+    # ty le rong-cao lon) - anh crop 1 tu nho (gan vuong) qua khac phan phoi input khien processor
+    # resize/pad thanh mot "trang" gan nhu trong -> model doan ngay EOS. Test CA 2 cach, bao cao ca 2
+    # de lam ro day la van de "ap dung sai kieu du lieu" chu khong phai loi code don thuan.
     try:
         import re as _re
         from transformers import DonutProcessor, VisionEncoderDecoderModel as DonutVED
@@ -416,10 +430,18 @@ def phase2_trocr_donut():
             task_prompt, add_special_tokens=False, return_tensors="pt"
         ).input_ids.to(device)
 
+        def _pad_to_page_canvas(image, canvas_size=(1280, 960)):
+            """Dan anh crop nho vao giua 1 'trang' trang - mo phong ty le anh SynthDoG duoc train."""
+            canvas = Image.new("RGB", canvas_size, (255, 255, 255))
+            w, h = image.size
+            scale = min(canvas_size[0] * 0.6 / w, canvas_size[1] * 0.6 / h, 4.0)
+            new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+            resized = image.resize((new_w, new_h))
+            canvas.paste(resized, ((canvas_size[0] - new_w) // 2, (canvas_size[1] - new_h) // 2))
+            return canvas
+
         @torch.no_grad()
-        def donut_predict(path):
-            image = Image.open(path).convert("RGB")
-            pixel_values = donut_processor(image, return_tensors="pt").pixel_values.to(device)
+        def _donut_generate(pixel_values):
             outputs = donut_model.generate(
                 pixel_values,
                 decoder_input_ids=decoder_input_ids,
@@ -431,13 +453,39 @@ def phase2_trocr_donut():
             )
             seq = donut_processor.batch_decode(outputs.sequences)[0]
             seq = seq.replace(donut_processor.tokenizer.eos_token, "").replace(donut_processor.tokenizer.pad_token, "")
-            seq = _re.sub(r"<.*?>", "", seq, count=1).strip()  # bo task token dau tien
+            seq = _re.sub(r"<.*?>", "", seq, count=1).strip()
             return seq
 
-        print("\n--- Donut-base (<s_synthdog>) tren Kaggle-Rx (Testing, toan bo) ---")
-        run_model_on_manifest("donut-base-synthdog", donut_predict, rx_test, "kaggle_rx")
-        print("\n--- Donut-base (<s_synthdog>) tren IAM (subsample 400) ---")
-        run_model_on_manifest("donut-base-synthdog", donut_predict, iam_sub, "iam")
+        def donut_predict_raw(path):
+            image = Image.open(path).convert("RGB")
+            pixel_values = donut_processor(image, return_tensors="pt").pixel_values.to(device)
+            return _donut_generate(pixel_values)
+
+        def donut_predict_padded(path):
+            image = _pad_to_page_canvas(Image.open(path).convert("RGB"))
+            pixel_values = donut_processor(image, return_tensors="pt").pixel_values.to(device)
+            return _donut_generate(pixel_values)
+
+        # Debug nhanh: in 5 output tho (chua qua run_model_on_manifest) de xac nhan truc quan
+        print("\n--- Donut DEBUG: 5 vi du dau cua rx_test, ca 2 cach (raw vs padded) ---")
+        for i in range(min(5, len(rx_test))):
+            row = rx_test.iloc[i]
+            raw = donut_predict_raw(row["image_path"])
+            padded = donut_predict_padded(row["image_path"])
+            print(f"  ref={row['label']!r}  raw={raw!r}  padded={padded!r}")
+
+        if RUN_DONUT_RAW_FULL:
+            print("\n--- Donut-base (<s_synthdog>, RAW - crop truc tiep) tren Kaggle-Rx ---")
+            run_model_on_manifest("donut-base-synthdog-raw", donut_predict_raw, rx_test, "kaggle_rx")
+            print("\n--- Donut-base (<s_synthdog>, RAW) tren IAM (subsample 400) ---")
+            run_model_on_manifest("donut-base-synthdog-raw", donut_predict_raw, iam_sub, "iam")
+        else:
+            print("  RUN_DONUT_RAW_FULL=False - bo qua (da co du lieu 'raw' tu kernel v6, xem results_master_phase2.csv, model='donut-base-synthdog')")
+
+        print("\n--- Donut-base (<s_synthdog>, PADDED - dan vao 'trang' trang) tren Kaggle-Rx ---")
+        run_model_on_manifest("donut-base-synthdog-padded", donut_predict_padded, rx_test, "kaggle_rx")
+        print("\n--- Donut-base (<s_synthdog>, PADDED) tren IAM (subsample 400) ---")
+        run_model_on_manifest("donut-base-synthdog-padded", donut_predict_padded, iam_sub, "iam")
     except Exception as e:
         print(f"  [LOI Donut, bo qua model nay]: {e}")
         traceback.print_exc()
