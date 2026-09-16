@@ -1,0 +1,124 @@
+[{"stream_name":"stdout","time":6.246488388,"data":"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.2/3.2 MB 88.8 MB/s eta 0:00:00\n"}
+,{"stream_name":"stdout","time":12.928695716,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":12.92876209,"data":"PHASE 0: Kiem tra cau truc /kaggle/input/\n"}
+,{"stream_name":"stdout","time":12.928769248,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":12.928773232,"data":"os.listdir('/kaggle/input') = ['datasets']\n"}
+,{"stream_name":"stdout","time":12.928776715,"data":"  /kaggle/input/datasets/mamun1113/ -\u003e ['doctors-handwritten-prescription-bd-dataset']\n"}
+,{"stream_name":"stdout","time":12.928780626,"data":"  /kaggle/input/datasets/nibinv23/ -\u003e ['iam-handwriting-word-database']\n"}
+,{"stream_name":"stdout","time":12.928784106,"data":"RX_ROOT da resolve = /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset  (ton tai: True)\n"}
+,{"stream_name":"stdout","time":12.928787691,"data":"IAM_ROOT da resolve = /kaggle/input/datasets/nibinv23/iam-handwriting-word-database  (ton tai: True)\n"}
+,{"stream_name":"stdout","time":12.928791304,"data":"\n"}
+,{"stream_name":"stdout","time":12.928794512,"data":"--- /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset ---\n"}
+,{"stream_name":"stdout","time":12.934713308,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/  (0 files, 1 subdirs)\n"}
+,{"stream_name":"stdout","time":12.938590893,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/  (0 files, 3 subdirs)\n"}
+,{"stream_name":"stdout","time":12.94193546,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Validation/  (1 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.941948799,"data":"      - validation_labels.csv\n"}
+,{"stream_name":"stdout","time":12.945087267,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Training/  (1 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.94509977,"data":"      - training_labels.csv\n"}
+,{"stream_name":"stdout","time":12.948461737,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing/  (1 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.948473429,"data":"      - testing_labels.csv\n"}
+,{"stream_name":"stdout","time":12.948476214,"data":"\n"}
+,{"stream_name":"stdout","time":12.948478402,"data":"--- /kaggle/input/datasets/nibinv23/iam-handwriting-word-database ---\n"}
+,{"stream_name":"stdout","time":12.955337053000001,"data":"  /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/  (1 files, 1 subdirs)\n"}
+,{"stream_name":"stdout","time":12.955349209,"data":"      - words_new.txt\n"}
+,{"stream_name":"stdout","time":12.961413699,"data":"  /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/iam_words/  (1 files, 1 subdirs)\n"}
+,{"stream_name":"stdout","time":12.961425429,"data":"      - words.txt\n"}
+,{"stream_name":"stdout","time":13.10909635,"data":"  /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/iam_words/words/  (0 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":13.109126745,"data":"\n"}
+,{"stream_name":"stdout","time":13.10913326,"data":"--- Doc thu cac file .csv/.xlsx trong RX_ROOT ---\n"}
+,{"stream_name":"stdout","time":20.808241113,"data":"\n"}
+,{"stream_name":"stdout","time":20.808295904,"data":"  File: /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Validation/validation_labels.csv\n"}
+,{"stream_name":"stdout","time":20.82741405,"data":"  Columns: ['IMAGE', 'MEDICINE_NAME', 'GENERIC_NAME']\n"}
+,{"stream_name":"stdout","time":20.839306682,"data":"   IMAGE MEDICINE_NAME GENERIC_NAME\n"}
+,{"stream_name":"stdout","time":20.839325255,"data":"0  0.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.83932855,"data":"1  1.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.839330973,"data":"2  2.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.839333162,"data":"\n"}
+,{"stream_name":"stdout","time":20.839335405,"data":"  File: /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Training/training_labels.csv\n"}
+,{"stream_name":"stdout","time":20.848516546,"data":"  Columns: ['IMAGE', 'MEDICINE_NAME', 'GENERIC_NAME']\n"}
+,{"stream_name":"stdout","time":20.849644561,"data":"   IMAGE MEDICINE_NAME GENERIC_NAME\n"}
+,{"stream_name":"stdout","time":20.849658302,"data":"0  0.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.849662182,"data":"1  1.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.849665615,"data":"2  2.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.849669109,"data":"\n"}
+,{"stream_name":"stdout","time":20.849672524,"data":"  File: /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing/testing_labels.csv\n"}
+,{"stream_name":"stdout","time":20.854551478,"data":"  Columns: ['IMAGE', 'MEDICINE_NAME', 'GENERIC_NAME']\n"}
+,{"stream_name":"stdout","time":20.85564714,"data":"   IMAGE MEDICINE_NAME GENERIC_NAME\n"}
+,{"stream_name":"stdout","time":20.855659392,"data":"0  0.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.855668025,"data":"1  1.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.855670499,"data":"2  2.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":20.855672738,"data":"\n"}
+,{"stream_name":"stdout","time":20.855674944,"data":"--- Doc thu words.txt cua IAM (dinh dang chuan: word_id status graylevel x y w h tag transcription) ---\n"}
+,{"stream_name":"stdout","time":20.856517258,"data":"  File: /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/iam_words/words.txt\n"}
+,{"stream_name":"stdout","time":20.908547185,"data":"  So dong (khong tinh comment): 44565\n"}
+,{"stream_name":"stdout","time":20.908592289,"data":"  3 dong dau: ['a01-000u-00-00 ok 154 408 768 27 51 AT A\\n', 'a01-000u-00-01 ok 154 507 766 213 48 NN MOVE\\n', 'a01-000u-00-02 ok 154 796 764 70 50 TO to\\n']\n"}
+,{"stream_name":"stdout","time":21.103231109,"data":"  -\u003e Doan: image_col='IMAGE', label_col='MEDICINE_NAME' (overlap voi vocab: 100.00%)\n"}
+,{"stream_name":"stdout","time":21.104298371,"data":"  split_dir='/kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing', img_dir='/kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing/testing_words/'\n"}
+,{"stream_name":"stdout","time":21.143309333,"data":"  build_manifest_kaggle_rx(Testing): 780/780 anh tim duoc tren dia\n"}
+,{"stream_name":"stdout","time":21.186292364,"data":"  words.txt: 38305 dong 'ok' hop le (truoc khi sample)\n"}
+,{"stream_name":"stdout","time":23.801551164,"data":"  build_manifest_iam: 400/400 anh da sample tim duoc tren dia\n"}
+,{"stream_name":"stdout","time":23.801661051,"data":"\n"}
+,{"stream_name":"stdout","time":23.801678095,"data":"--- Tesseract tren Kaggle-Rx (Testing, toan bo) ---\n"}
+,{"stream_name":"stdout","time":29.910224623,"data":"  [tesseract/kaggle_rx] 50/780 anh, 6.1s, CER trung binh tam thoi = 0.702\n"}
+,{"stream_name":"stdout","time":35.860377275,"data":"  [tesseract/kaggle_rx] 100/780 anh, 12.1s, CER trung binh tam thoi = 0.607\n"}
+,{"stream_name":"stdout","time":42.009468049,"data":"  [tesseract/kaggle_rx] 150/780 anh, 18.2s, CER trung binh tam thoi = 0.658\n"}
+,{"stream_name":"stdout","time":47.99264162,"data":"  [tesseract/kaggle_rx] 200/780 anh, 24.2s, CER trung binh tam thoi = 0.640\n"}
+,{"stream_name":"stdout","time":53.886149281,"data":"  [tesseract/kaggle_rx] 250/780 anh, 30.1s, CER trung binh tam thoi = 0.609\n"}
+,{"stream_name":"stdout","time":59.791127243,"data":"  [tesseract/kaggle_rx] 300/780 anh, 36.0s, CER trung binh tam thoi = 0.629\n"}
+,{"stream_name":"stdout","time":65.73782815,"data":"  [tesseract/kaggle_rx] 350/780 anh, 41.9s, CER trung binh tam thoi = 0.613\n"}
+,{"stream_name":"stdout","time":71.889292402,"data":"  [tesseract/kaggle_rx] 400/780 anh, 48.1s, CER trung binh tam thoi = 0.619\n"}
+,{"stream_name":"stdout","time":77.995155644,"data":"  [tesseract/kaggle_rx] 450/780 anh, 54.2s, CER trung binh tam thoi = 0.629\n"}
+,{"stream_name":"stdout","time":84.061557171,"data":"  [tesseract/kaggle_rx] 500/780 anh, 60.3s, CER trung binh tam thoi = 0.635\n"}
+,{"stream_name":"stdout","time":90.306375758,"data":"  [tesseract/kaggle_rx] 550/780 anh, 66.5s, CER trung binh tam thoi = 0.639\n"}
+,{"stream_name":"stdout","time":96.313861514,"data":"  [tesseract/kaggle_rx] 600/780 anh, 72.5s, CER trung binh tam thoi = 0.641\n"}
+,{"stream_name":"stdout","time":102.236130773,"data":"  [tesseract/kaggle_rx] 650/780 anh, 78.4s, CER trung binh tam thoi = 0.633\n"}
+,{"stream_name":"stdout","time":108.038796006,"data":"  [tesseract/kaggle_rx] 700/780 anh, 84.2s, CER trung binh tam thoi = 0.628\n"}
+,{"stream_name":"stdout","time":113.879925148,"data":"  [tesseract/kaggle_rx] 750/780 anh, 90.1s, CER trung binh tam thoi = 0.629\n"}
+,{"stream_name":"stdout","time":117.361092826,"data":"  Da ghi 780 dong vao /kaggle/working/results/results_master.csv\n"}
+,{"stream_name":"stdout","time":117.362772063,"data":"\n"}
+,{"stream_name":"stdout","time":117.362785801,"data":"--- Tesseract tren IAM (subsample 400) ---\n"}
+,{"stream_name":"stdout","time":123.40155693,"data":"  [tesseract/iam] 50/400 anh, 6.0s, CER trung binh tam thoi = 0.822\n"}
+,{"stream_name":"stdout","time":129.387527391,"data":"  [tesseract/iam] 100/400 anh, 12.0s, CER trung binh tam thoi = 0.889\n"}
+,{"stream_name":"stdout","time":135.333525825,"data":"  [tesseract/iam] 150/400 anh, 18.0s, CER trung binh tam thoi = 0.851\n"}
+,{"stream_name":"stdout","time":141.369443865,"data":"  [tesseract/iam] 200/400 anh, 24.0s, CER trung binh tam thoi = 0.825\n"}
+,{"stream_name":"stdout","time":147.392364102,"data":"  [tesseract/iam] 250/400 anh, 30.0s, CER trung binh tam thoi = 0.833\n"}
+,{"stream_name":"stdout","time":153.392043918,"data":"  [tesseract/iam] 300/400 anh, 36.0s, CER trung binh tam thoi = 0.841\n"}
+,{"stream_name":"stdout","time":159.302765759,"data":"  [tesseract/iam] 350/400 anh, 41.9s, CER trung binh tam thoi = 0.836\n"}
+,{"stream_name":"stdout","time":165.228214977,"data":"  [tesseract/iam] 400/400 anh, 47.9s, CER trung binh tam thoi = 0.836\n"}
+,{"stream_name":"stdout","time":165.233025055,"data":"  Da ghi 400 dong vao /kaggle/working/results/results_master.csv\n"}
+,{"stream_name":"stdout","time":180.566509827,"data":"\n"}
+,{"stream_name":"stdout","time":180.56655781,"data":"--- EasyOCR tren Kaggle-Rx (Testing, toan bo) ---\n"}
+,{"stream_name":"stdout","time":183.510691478,"data":"  [easyocr/kaggle_rx] 50/780 anh, 2.9s, CER trung binh tam thoi = 0.627\n"}
+,{"stream_name":"stdout","time":184.778385068,"data":"  [easyocr/kaggle_rx] 100/780 anh, 4.2s, CER trung binh tam thoi = 0.487\n"}
+,{"stream_name":"stdout","time":186.270205737,"data":"  [easyocr/kaggle_rx] 150/780 anh, 5.7s, CER trung binh tam thoi = 0.554\n"}
+,{"stream_name":"stdout","time":187.61413165,"data":"  [easyocr/kaggle_rx] 200/780 anh, 7.0s, CER trung binh tam thoi = 0.561\n"}
+,{"stream_name":"stdout","time":188.971275116,"data":"  [easyocr/kaggle_rx] 250/780 anh, 8.4s, CER trung binh tam thoi = 0.540\n"}
+,{"stream_name":"stdout","time":190.317561018,"data":"  [easyocr/kaggle_rx] 300/780 anh, 9.8s, CER trung binh tam thoi = 0.546\n"}
+,{"stream_name":"stdout","time":191.745343553,"data":"  [easyocr/kaggle_rx] 350/780 anh, 11.2s, CER trung binh tam thoi = 0.533\n"}
+,{"stream_name":"stdout","time":193.229226119,"data":"  [easyocr/kaggle_rx] 400/780 anh, 12.7s, CER trung binh tam thoi = 0.549\n"}
+,{"stream_name":"stdout","time":194.655504445,"data":"  [easyocr/kaggle_rx] 450/780 anh, 14.1s, CER trung binh tam thoi = 0.547\n"}
+,{"stream_name":"stdout","time":195.965533846,"data":"  [easyocr/kaggle_rx] 500/780 anh, 15.4s, CER trung binh tam thoi = 0.545\n"}
+,{"stream_name":"stdout","time":197.525702303,"data":"  [easyocr/kaggle_rx] 550/780 anh, 17.0s, CER trung binh tam thoi = 0.549\n"}
+,{"stream_name":"stdout","time":198.794763175,"data":"  [easyocr/kaggle_rx] 600/780 anh, 18.2s, CER trung binh tam thoi = 0.553\n"}
+,{"stream_name":"stdout","time":200.131416504,"data":"  [easyocr/kaggle_rx] 650/780 anh, 19.6s, CER trung binh tam thoi = 0.552\n"}
+,{"stream_name":"stdout","time":201.426586741,"data":"  [easyocr/kaggle_rx] 700/780 anh, 20.9s, CER trung binh tam thoi = 0.551\n"}
+,{"stream_name":"stdout","time":202.651942504,"data":"  [easyocr/kaggle_rx] 750/780 anh, 22.1s, CER trung binh tam thoi = 0.551\n"}
+,{"stream_name":"stdout","time":203.435200199,"data":"  Da ghi 780 dong vao /kaggle/working/results/results_master.csv\n"}
+,{"stream_name":"stdout","time":203.437358741,"data":"\n"}
+,{"stream_name":"stdout","time":203.437372448,"data":"--- EasyOCR tren IAM (subsample 400) ---\n"}
+,{"stream_name":"stdout","time":204.793929896,"data":"  [easyocr/iam] 50/400 anh, 1.4s, CER trung binh tam thoi = 0.777\n"}
+,{"stream_name":"stdout","time":206.096938762,"data":"  [easyocr/iam] 100/400 anh, 2.7s, CER trung binh tam thoi = 0.741\n"}
+,{"stream_name":"stdout","time":207.292267189,"data":"  [easyocr/iam] 150/400 anh, 3.9s, CER trung binh tam thoi = 0.747\n"}
+,{"stream_name":"stdout","time":208.577682107,"data":"  [easyocr/iam] 200/400 anh, 5.1s, CER trung binh tam thoi = 0.733\n"}
+,{"stream_name":"stdout","time":209.798327792,"data":"  [easyocr/iam] 250/400 anh, 6.4s, CER trung binh tam thoi = 0.733\n"}
+,{"stream_name":"stdout","time":210.984634319,"data":"  [easyocr/iam] 300/400 anh, 7.5s, CER trung binh tam thoi = 0.734\n"}
+,{"stream_name":"stdout","time":212.130512075,"data":"  [easyocr/iam] 350/400 anh, 8.7s, CER trung binh tam thoi = 0.733\n"}
+,{"stream_name":"stdout","time":213.354672434,"data":"  [easyocr/iam] 400/400 anh, 9.9s, CER trung binh tam thoi = 0.736\n"}
+,{"stream_name":"stdout","time":213.358780958,"data":"  Da ghi 400 dong vao /kaggle/working/results/results_master.csv\n"}
+,{"stream_name":"stderr","time":218.216639025,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":218.216689323,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":218.48751044,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":218.487558656,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":219.112122283,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":220.400089318,"data":"[NbConvertApp] Writing 351453 bytes to __results__.html\n"}
+]
