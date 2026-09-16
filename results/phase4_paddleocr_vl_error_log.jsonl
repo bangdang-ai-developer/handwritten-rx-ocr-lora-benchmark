@@ -1,0 +1,140 @@
+[{"stream_name":"stdout","time":5.820672392,"data":"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.2/3.2 MB 63.1 MB/s eta 0:00:00\n"}
+,{"stream_name":"stdout","time":12.700134975,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":12.700166897,"data":"PHASE 0: Kiem tra cau truc /kaggle/input/\n"}
+,{"stream_name":"stdout","time":12.700172817,"data":"======================================================================\n"}
+,{"stream_name":"stdout","time":12.700178585,"data":"os.listdir('/kaggle/input') = ['datasets']\n"}
+,{"stream_name":"stdout","time":12.700183195,"data":"  /kaggle/input/datasets/mamun1113/ -\u003e ['doctors-handwritten-prescription-bd-dataset']\n"}
+,{"stream_name":"stdout","time":12.700188955,"data":"  /kaggle/input/datasets/nibinv23/ -\u003e ['iam-handwriting-word-database']\n"}
+,{"stream_name":"stdout","time":12.700314024,"data":"RX_ROOT da resolve = /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset  (ton tai: True)\n"}
+,{"stream_name":"stdout","time":12.700337375,"data":"IAM_ROOT da resolve = /kaggle/input/datasets/nibinv23/iam-handwriting-word-database  (ton tai: True)\n"}
+,{"stream_name":"stdout","time":12.700342593,"data":"\n"}
+,{"stream_name":"stdout","time":12.700346852,"data":"--- /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset ---\n"}
+,{"stream_name":"stdout","time":12.704562578,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/  (0 files, 1 subdirs)\n"}
+,{"stream_name":"stdout","time":12.707097872,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/  (0 files, 3 subdirs)\n"}
+,{"stream_name":"stdout","time":12.709370298,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Validation/  (1 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.709388649,"data":"      - validation_labels.csv\n"}
+,{"stream_name":"stdout","time":12.711699261,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Training/  (1 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.711717589,"data":"      - training_labels.csv\n"}
+,{"stream_name":"stdout","time":12.714084449,"data":"  /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing/  (1 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.714101361,"data":"      - testing_labels.csv\n"}
+,{"stream_name":"stdout","time":12.714106396,"data":"\n"}
+,{"stream_name":"stdout","time":12.714110721,"data":"--- /kaggle/input/datasets/nibinv23/iam-handwriting-word-database ---\n"}
+,{"stream_name":"stdout","time":12.720249763,"data":"  /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/  (1 files, 1 subdirs)\n"}
+,{"stream_name":"stdout","time":12.720266199,"data":"      - words_new.txt\n"}
+,{"stream_name":"stdout","time":12.727379384,"data":"  /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/iam_words/  (1 files, 1 subdirs)\n"}
+,{"stream_name":"stdout","time":12.727395097,"data":"      - words.txt\n"}
+,{"stream_name":"stdout","time":12.924484324,"data":"  /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/iam_words/words/  (0 files, 0 subdirs)\n"}
+,{"stream_name":"stdout","time":12.924566678,"data":"\n"}
+,{"stream_name":"stdout","time":12.924574719,"data":"--- Doc thu cac file .csv/.xlsx trong RX_ROOT ---\n"}
+,{"stream_name":"stdout","time":17.642378829,"data":"\n"}
+,{"stream_name":"stdout","time":17.642437287,"data":"  File: /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Validation/validation_labels.csv\n"}
+,{"stream_name":"stdout","time":17.658846971,"data":"  Columns: ['IMAGE', 'MEDICINE_NAME', 'GENERIC_NAME']\n"}
+,{"stream_name":"stdout","time":17.670642339,"data":"   IMAGE MEDICINE_NAME GENERIC_NAME\n"}
+,{"stream_name":"stdout","time":17.670665282999998,"data":"0  0.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.670671059,"data":"1  1.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.670675043,"data":"2  2.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.670679109,"data":"\n"}
+,{"stream_name":"stdout","time":17.670682609,"data":"  File: /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Training/training_labels.csv\n"}
+,{"stream_name":"stdout","time":17.678094373,"data":"  Columns: ['IMAGE', 'MEDICINE_NAME', 'GENERIC_NAME']\n"}
+,{"stream_name":"stdout","time":17.679673168,"data":"   IMAGE MEDICINE_NAME GENERIC_NAME\n"}
+,{"stream_name":"stdout","time":17.679687362,"data":"0  0.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.679696184,"data":"1  1.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.679700867,"data":"2  2.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.679705534,"data":"\n"}
+,{"stream_name":"stdout","time":17.679709854,"data":"  File: /kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing/testing_labels.csv\n"}
+,{"stream_name":"stdout","time":17.683904541,"data":"  Columns: ['IMAGE', 'MEDICINE_NAME', 'GENERIC_NAME']\n"}
+,{"stream_name":"stdout","time":17.685097129,"data":"   IMAGE MEDICINE_NAME GENERIC_NAME\n"}
+,{"stream_name":"stdout","time":17.685112169,"data":"0  0.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.685116981,"data":"1  1.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.68512101,"data":"2  2.png         Aceta  Paracetamol\n"}
+,{"stream_name":"stdout","time":17.685125132,"data":"\n"}
+,{"stream_name":"stdout","time":17.685135537,"data":"--- Doc thu words.txt cua IAM (dinh dang chuan: word_id status graylevel x y w h tag transcription) ---\n"}
+,{"stream_name":"stdout","time":17.685728021,"data":"  File: /kaggle/input/datasets/nibinv23/iam-handwriting-word-database/iam_words/words.txt\n"}
+,{"stream_name":"stdout","time":17.72859016,"data":"  So dong (khong tinh comment): 44565\n"}
+,{"stream_name":"stdout","time":17.728617993,"data":"  3 dong dau: ['a01-000u-00-00 ok 154 408 768 27 51 AT A\\n', 'a01-000u-00-01 ok 154 507 766 213 48 NN MOVE\\n', 'a01-000u-00-02 ok 154 796 764 70 50 TO to\\n']\n"}
+,{"stream_name":"stdout","time":18.936019211,"data":"     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 41.4/41.4 kB 1.8 MB/s eta 0:00:00\n"}
+,{"stream_name":"stderr","time":19.487108421,"data":"WARNING: The candidate selected for download or install is a yanked version: 'transformers' candidate (version 4.57.0 at https://files.pythonhosted.org/packages/e5/2b/4d2708ac1ff5cd708b6548f4c5812d0ae40d1c28591c4c1c762b6dbdef2d/transformers-4.57.0-py3-none-any.whl (from https://pypi.org/simple/transformers/) (requires-python:\u003e=3.9.0))\n"}
+,{"stream_name":"stderr","time":19.487174394,"data":"Reason for being yanked: Error in the setup causing installation issues\n"}
+,{"stream_name":"stdout","time":19.616307799,"data":"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.0/12.0 MB 110.4 MB/s eta 0:00:00\n"}
+,{"stream_name":"stdout","time":19.643810961,"data":"   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 566.4/566.4 kB 32.0 MB/s eta 0:00:00\n"}
+,{"stream_name":"stdout","time":38.459718635,"data":"  device = cuda\n"}
+,{"stream_name":"stdout","time":40.477789455,"data":"  -\u003e Doan: image_col='IMAGE', label_col='MEDICINE_NAME' (overlap voi vocab: 100.00%)\n"}
+,{"stream_name":"stdout","time":40.481152295,"data":"  split_dir='/kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing', img_dir='/kaggle/input/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset/Doctor’s Handwritten Prescription BD dataset/Testing/testing_words/'\n"}
+,{"stream_name":"stdout","time":40.506406821,"data":"  build_manifest_kaggle_rx(Testing): 780/780 anh tim duoc tren dia\n"}
+,{"stream_name":"stdout","time":40.552324933,"data":"  words.txt: 38305 dong 'ok' hop le (truoc khi sample)\n"}
+,{"stream_name":"stdout","time":44.486284738,"data":"  build_manifest_iam: 400/400 anh da sample tim duoc tren dia\n"}
+,{"stream_name":"stderr","time":74.377751787,"data":"A new version of the following files was downloaded from https://huggingface.co/PaddlePaddle/PaddleOCR-VL:\n"}
+,{"stream_name":"stderr","time":74.377782556,"data":"- configuration_paddleocr_vl.py\n"}
+,{"stream_name":"stderr","time":74.377787814,"data":". Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.\n"}
+,{"stream_name":"stderr","time":74.380414886,"data":"`torch_dtype` is deprecated! Use `dtype` instead!\n"}
+,{"stream_name":"stderr","time":74.565869215,"data":"A new version of the following files was downloaded from https://huggingface.co/PaddlePaddle/PaddleOCR-VL:\n"}
+,{"stream_name":"stderr","time":74.565892972,"data":"- modeling_paddleocr_vl.py\n"}
+,{"stream_name":"stderr","time":74.565898388,"data":". Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.\n"}
+,{"stream_name":"stderr","time":85.294968556,"data":"A new version of the following files was downloaded from https://huggingface.co/PaddlePaddle/PaddleOCR-VL:\n"}
+,{"stream_name":"stderr","time":85.29500347,"data":"- processing_paddleocr_vl.py\n"}
+,{"stream_name":"stderr","time":85.295014985,"data":". Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.\n"}
+,{"stream_name":"stderr","time":85.52743529,"data":"Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.\n"}
+,{"stream_name":"stdout","time":96.132455546,"data":"\n"}
+,{"stream_name":"stdout","time":96.132519371,"data":"--- Debug: 5 vi du dau PaddleOCR-VL tren rx_test ---\n"}
+,{"stream_name":"stdout","time":97.527353406,"data":"  [LOI PaddleOCR-VL, bo qua model nay]: create_causal_mask() got an unexpected keyword argument 'inputs_embeds'\n"}
+,{"stream_name":"stderr","time":97.536636981,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":97.536816414,"data":"  File \"/usr/local/lib/python3.12/dist-packages/transformers/utils/generic.py\", line 1071, in wrapper\n"}
+,{"stream_name":"stderr","time":97.536845649,"data":"    outputs = func(self, *args, **kwargs_without_recordable)\n"}
+,{"stream_name":"stderr","time":97.536868822,"data":"              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.536873231,"data":"  File \"/root/.cache/huggingface/modules/transformers_modules/PaddlePaddle/PaddleOCR_hyphen_VL/7fa00a8c55b735ba51ba49a9058f3f9c57a99a11/modeling_paddleocr_vl.py\", line 606, in forward\n"}
+,{"stream_name":"stderr","time":97.536877853,"data":"    causal_mask = create_causal_mask(\n"}
+,{"stream_name":"stderr","time":97.536882114,"data":"                  ^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.536886235,"data":"TypeError: create_causal_mask() got an unexpected keyword argument 'inputs_embeds'\n"}
+,{"stream_name":"stderr","time":97.537018914,"data":"\n"}
+,{"stream_name":"stderr","time":97.537032569,"data":"During handling of the above exception, another exception occurred:\n"}
+,{"stream_name":"stderr","time":97.537037334,"data":"\n"}
+,{"stream_name":"stderr","time":97.53704116,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":97.53755951,"data":"  File \"/kaggle/src/script.py\", line 640, in phase4_paddleocr_vl\n"}
+,{"stream_name":"stderr","time":97.537566965,"data":"    pred = pvl_predict(row[\"image_path\"])\n"}
+,{"stream_name":"stderr","time":97.537570556,"data":"           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.53757433,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py\", line 124, in decorate_context\n"}
+,{"stream_name":"stderr","time":97.537583196,"data":"    return func(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.537586123,"data":"           ^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537588325,"data":"  File \"/kaggle/src/script.py\", line 630, in pvl_predict\n"}
+,{"stream_name":"stderr","time":97.537590685,"data":"    outputs = pvl_model.generate(**inputs, max_new_tokens=32)\n"}
+,{"stream_name":"stderr","time":97.537593642,"data":"              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.53760964,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py\", line 124, in decorate_context\n"}
+,{"stream_name":"stderr","time":97.537613987,"data":"    return func(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.53761801,"data":"           ^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537625144,"data":"  File \"/usr/local/lib/python3.12/dist-packages/transformers/generation/utils.py\", line 2564, in generate\n"}
+,{"stream_name":"stderr","time":97.537629451,"data":"    result = decoding_method(\n"}
+,{"stream_name":"stderr","time":97.537633426,"data":"             ^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537637224,"data":"  File \"/usr/local/lib/python3.12/dist-packages/transformers/generation/utils.py\", line 2784, in _sample\n"}
+,{"stream_name":"stderr","time":97.537641464,"data":"    outputs = self(**model_inputs, return_dict=True)\n"}
+,{"stream_name":"stderr","time":97.537645495,"data":"              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537649179,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py\", line 1776, in _wrapped_call_impl\n"}
+,{"stream_name":"stderr","time":97.53765288,"data":"    return self._call_impl(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.537656414,"data":"           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537659826,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py\", line 1787, in _call_impl\n"}
+,{"stream_name":"stderr","time":97.537678159,"data":"    return forward_call(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.537681243,"data":"           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537683756,"data":"  File \"/root/.cache/huggingface/modules/transformers_modules/PaddlePaddle/PaddleOCR_hyphen_VL/7fa00a8c55b735ba51ba49a9058f3f9c57a99a11/modeling_paddleocr_vl.py\", line 2265, in forward\n"}
+,{"stream_name":"stderr","time":97.537688087,"data":"    outputs = self.model(\n"}
+,{"stream_name":"stderr","time":97.537690266,"data":"              ^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537692419,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py\", line 1776, in _wrapped_call_impl\n"}
+,{"stream_name":"stderr","time":97.537694844,"data":"    return self._call_impl(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.537697009,"data":"           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537721161,"data":"  File \"/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py\", line 1787, in _call_impl\n"}
+,{"stream_name":"stderr","time":97.537726256,"data":"    return forward_call(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.537730233,"data":"           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537733824,"data":"  File \"/usr/local/lib/python3.12/dist-packages/transformers/utils/generic.py\", line 1073, in wrapper\n"}
+,{"stream_name":"stderr","time":97.537738231,"data":"    raise original_exception\n"}
+,{"stream_name":"stderr","time":97.537742054,"data":"  File \"/usr/local/lib/python3.12/dist-packages/transformers/utils/generic.py\", line 1064, in wrapper\n"}
+,{"stream_name":"stderr","time":97.537745957,"data":"    outputs = func(self, *args, **kwargs)\n"}
+,{"stream_name":"stderr","time":97.537749261,"data":"              ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537752728,"data":"  File \"/root/.cache/huggingface/modules/transformers_modules/PaddlePaddle/PaddleOCR_hyphen_VL/7fa00a8c55b735ba51ba49a9058f3f9c57a99a11/modeling_paddleocr_vl.py\", line 606, in forward\n"}
+,{"stream_name":"stderr","time":97.537756774,"data":"    causal_mask = create_causal_mask(\n"}
+,{"stream_name":"stderr","time":97.537760041,"data":"                  ^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":97.537763323,"data":"TypeError: create_causal_mask() got an unexpected keyword argument 'inputs_embeds'\n"}
+,{"stream_name":"stderr","time":103.747002928,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":103.747066168,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":104.013779842,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":104.013821422,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":104.703743236,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":105.575353683,"data":"[NbConvertApp] Writing 407233 bytes to __results__.html\n"}
+]

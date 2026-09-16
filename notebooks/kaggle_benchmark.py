@@ -50,7 +50,7 @@ import numpy as np
 # ============================================================
 # CAU HINH
 # ============================================================
-CURRENT_PHASE = 4   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
+CURRENT_PHASE = 5   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
 # Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
@@ -593,9 +593,30 @@ def phase3_got_ocr2():
 # PHASE 4 — PaddleOCR-VL (0.9B, element-level recognition qua transformers)
 # ============================================================
 def phase4_paddleocr_vl():
-    # Bai hoc tu Phase 3 (GOT-OCR2.0): (1) ghim version thay vi de pip tu chon moi nhat,
-    # (2) dung float16 thay bfloat16 tren T4/Turing (khong co tensor core bf16 that),
-    # (3) luon debug 5 anh + _assert_sane_debug_output truoc khi chay full 1180 anh.
+    # ============================================================================
+    # DA LOAI KHOI BENCHMARK (16/09/2026) - LOI TUONG THICH THUONG NGUON, KHONG PHAI LOI O DAY.
+    # ============================================================================
+    # kernel v12: transformers==4.57.0 -> TypeError: create_causal_mask() got an unexpected
+    # keyword argument 'inputs_embeds' (trong modeling_paddleocr_vl.py tai remote_code cua
+    # chinh HF repo PaddlePaddle/PaddleOCR-VL, khong phai code cua ta).
+    # Da tra cuu: day la loi CONG DONG DA BAO CAO, CHUA CO GIAI PHAP tinh den nay -
+    # xem thao luan "Newest commit breaks compatibility with transformers==4.57.6,
+    # while 5.3.0 is broken as well" tai
+    # https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.5/discussions/22
+    # (dong 30/04, khong co ban ghi giai phap; nguyen van: "Anything above transformers==5
+    # with AutoModelForImageTextToText has seemingly always been broken"). Tuc la PaddleOCR-VL
+    # qua duong transformers/trust_remote_code hien khong hoat dong on dinh o BAT KY version
+    # transformers nao da thu (ca truoc va sau 5.0), khong lien quan gi den T4/dtype/prompt cua ta.
+    # QUYET DINH: LOAI PaddleOCR-VL khoi benchmark zero-shot (khong dang chi phi debug them mot
+    # loi thuong nguon chua co fix) - chuyen sang Phase 5 (Qwen-VL, he sinh thai on dinh hon
+    # nhieu, da co tien le Unsloth chay tren T4). Ghi lai code o day de tham khao/thu lai sau
+    # neu PaddlePaddle phat hanh ban fix.
+    print("  [BO QUA] PaddleOCR-VL loai khoi benchmark do loi tuong thich thuong nguon "
+          "(transformers/trust_remote_code) chua co fix - xem comment code va "
+          "results/phase4_summary.md de biet chi tiet + nguon tham khao.")
+    return
+
+    # --- Code goc, giu lai de thu lai neu PaddlePaddle fix trong tuong lai ---
     _pip_install("transformers==4.57.0", "accelerate")
     import torch
     from PIL import Image
@@ -653,6 +674,66 @@ def phase4_paddleocr_vl():
 
 
 # ============================================================
+# PHASE 5 — Qwen2.5-VL-3B-Instruct (VLM tong quat, doi chung voi cac model OCR chuyen biet)
+# ============================================================
+def phase5_qwen_vl():
+    # Dung ban 3B (khong phai 7B/8B) - fp16 ~6GB, an toan tren T4 16GB cho zero-shot inference
+    # (khong fine-tune nen khong can lo optimizer state). Qwen2.5-VL la first-class model trong
+    # transformers (khong can trust_remote_code) - it rui ro dut gay API hon GOT-OCR2.0/PaddleOCR-VL.
+    _pip_install("transformers==4.57.0", "accelerate", "qwen-vl-utils")
+    import torch
+    from PIL import Image
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"  device = {device}")
+
+    rx_test = build_manifest_kaggle_rx("Testing")
+    iam_sub = build_manifest_iam(n_sample=400)
+
+    try:
+        from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+
+        model_path = "Qwen/Qwen2.5-VL-3B-Instruct"
+        qwen_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            model_path, dtype=torch.float16 if device == "cuda" else torch.float32
+        ).to(device).eval()
+        qwen_processor = AutoProcessor.from_pretrained(model_path)
+
+        QUESTION = "Read the handwritten/printed text in this image. Output ONLY the text itself, nothing else."
+
+        @torch.no_grad()
+        def qwen_predict(path):
+            image = Image.open(path).convert("RGB")
+            messages = [{"role": "user", "content": [
+                {"type": "image", "image": image},
+                {"type": "text", "text": QUESTION},
+            ]}]
+            text = qwen_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            inputs = qwen_processor(text=[text], images=[image], return_tensors="pt").to(device)
+            generated_ids = qwen_model.generate(**inputs, max_new_tokens=32)
+            trimmed = generated_ids[:, inputs["input_ids"].shape[1]:]
+            return qwen_processor.batch_decode(trimmed, skip_special_tokens=True)[0].strip()
+
+        print("\n--- Debug: 5 vi du dau Qwen2.5-VL-3B tren rx_test ---")
+        debug_preds = []
+        for i in range(min(5, len(rx_test))):
+            row = rx_test.iloc[i]
+            pred = qwen_predict(row["image_path"])
+            debug_preds.append(pred)
+            print(f"  ref={row['label']!r}  pred={pred!r}")
+
+        _assert_sane_debug_output("Qwen2.5-VL-3B", debug_preds, max_avg_len=100)  # VLM tong quat co the dai dong hon 1 tu
+
+        print("\n--- Qwen2.5-VL-3B tren Kaggle-Rx (Testing, toan bo) ---")
+        run_model_on_manifest("qwen2.5-vl-3b", qwen_predict, rx_test, "kaggle_rx")
+        print("\n--- Qwen2.5-VL-3B tren IAM (subsample 400) ---")
+        run_model_on_manifest("qwen2.5-vl-3b", qwen_predict, iam_sub, "iam")
+    except Exception as e:
+        print(f"  [LOI Qwen2.5-VL, bo qua model nay]: {e}")
+        traceback.print_exc()
+
+
+# ============================================================
 # MAIN
 # ============================================================
 if __name__ == "__main__":
@@ -669,7 +750,7 @@ if __name__ == "__main__":
         phase3_got_ocr2()
     elif CURRENT_PHASE == 4:
         phase4_paddleocr_vl()
-    elif CURRENT_PHASE >= 5:
-        print(f"PHASE {CURRENT_PHASE} (Qwen-VL) chua duoc them vao script nay — se bo sung "
-              "sau khi xac nhan PHASE 4 chay dung. Xem docs/05-ke-hoach-Q2.md cho danh sach "
-              "lenh cai dat cua tung model.")
+    elif CURRENT_PHASE == 5:
+        phase5_qwen_vl()
+    elif CURRENT_PHASE >= 6:
+        print(f"PHASE {CURRENT_PHASE} chua duoc them vao script nay. Xem docs/05-ke-hoach-Q2.md.")
