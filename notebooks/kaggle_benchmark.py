@@ -792,6 +792,14 @@ def phase6_finetune_trocr():
 
     processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
     base_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
+    # BAT BUOC cho fine-tune VisionEncoderDecoderModel (kernel v15: ValueError khi thieu) -
+    # generate() zero-shot (Phase 2) khong can dong nay vi tu suy ra duoc, nhung training
+    # (shift_tokens_right lam teacher-forcing labels) can config day du. Theo dung convention
+    # chuan cua TrOCR (NielsRogge/Transformers-Tutorials fine-tune notebook, da dan trong ke hoach).
+    base_model.config.decoder_start_token_id = processor.tokenizer.cls_token_id
+    base_model.config.pad_token_id = processor.tokenizer.pad_token_id
+    base_model.config.eos_token_id = processor.tokenizer.sep_token_id
+    base_model.config.vocab_size = base_model.config.decoder.vocab_size
     MAX_TARGET_LEN = 32
 
     class RxTorchDataset(torch.utils.data.Dataset):
