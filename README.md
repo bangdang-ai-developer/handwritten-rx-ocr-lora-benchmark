@@ -12,9 +12,23 @@ Bộ tài liệu này được tổng hợp để chuẩn bị cho một dự á
 
 ## Tiến độ thực tế (cập nhật liên tục)
 
-- ✅ **Phase 1** (Tesseract, EasyOCR) — xong, kết quả thật tại [results/phase1_summary.md](results/phase1_summary.md). CER 0.55–0.84, EasyOCR thắng rõ nhưng cả 2 đều sai >50% ký tự trên chữ viết tay.
-- 🔄 **Phase 2** (TrOCR-large-handwritten, Donut-base zero-shot) — đang chạy trên Kaggle GPU (kernel `dangbang1/ocr-med-benchmark-phase1`, điều khiển trực tiếp qua `kaggle kernels push/status/output` — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py)).
-- ⏭️ Phase 3-5 (GOT-OCR2.0, PaddleOCR-VL, Qwen-VL) → Phase 6-8 (**LoRA fine-tune TrOCR-large-handwritten**, đánh giá lại + catastrophic-forgetting check) → Phase 9-13 (phân tích + viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md).
+**Benchmark zero-shot (Phase 1-5) ĐÃ XONG** — 5 model chạy thật thành công + 1 loại trừ có ghi chú:
+
+| Model | CER kaggle_rx | CER iam | Ghi chú |
+|---|---|---|---|
+| **Qwen2.5-VL-3B-Instruct** | **0.434 (tốt nhất)** | 1.10* | *mean bị outlier kéo lệch — median=0.0, xem [phase5](results/phase5_summary.md) |
+| **GOT-OCR2.0** | 0.479 | **0.386 (tốt nhất)** | phải ghim `transformers==4.57.0` mới chạy đúng, xem [phase3](results/phase3_summary.md) |
+| EasyOCR | 0.552 | 0.736 | |
+| TrOCR-large-handwritten | 0.580 | 0.441 | top-1 acc cao nhất nhóm OCR chuyên biệt (79.5%) |
+| Tesseract | 0.625 | 0.836 | baseline cổ điển |
+| Donut-base | 1.00 (thất bại) | 1.00 (thất bại) | phát hiện hợp lệ — xem [phase2](results/phase2_summary.md) |
+| ~~PaddleOCR-VL~~ | loại trừ | loại trừ | lỗi tương thích thượng nguồn chưa có fix, xem [phase4](results/phase4_summary.md) |
+
+**Phát hiện nổi bật nhất:** trên đúng domain mục tiêu (đơn thuốc), VLM tổng quát nhỏ (Qwen2.5-VL-3B) vượt qua mọi model OCR chuyên biệt — kể cả GOT-OCR2.0 vốn được thiết kế riêng cho OCR.
+
+Toàn bộ dữ liệu thô: [results/results_master_combined.csv](results/results_master_combined.csv) (8.260 dòng).
+
+**Tiếp theo:** Phase 6-8 (**LoRA fine-tune TrOCR-large-handwritten** trên 2.808 ảnh train, đánh giá cải thiện in-domain + catastrophic-forgetting trên IAM) → Phase 9-13 (phân tích thống kê + viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md). Toàn bộ pipeline chạy qua điều khiển trực tiếp Kaggle API (`kaggle kernels push/status/output`, không cần mở trình duyệt) — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py).
 
 ## Điểm mấu chốt (tóm tắt nhanh)
 
