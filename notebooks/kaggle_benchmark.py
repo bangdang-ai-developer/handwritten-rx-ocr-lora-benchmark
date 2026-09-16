@@ -506,6 +506,9 @@ def phase3_got_ocr2():
     iam_sub = build_manifest_iam(n_sample=400)
 
     try:
+        import transformers as _tf
+        print(f"  transformers.__version__ = {_tf.__version__}, torch.__version__ = {torch.__version__}")
+
         from transformers import AutoProcessor, AutoModelForImageTextToText
 
         got_processor = AutoProcessor.from_pretrained("stepfun-ai/GOT-OCR-2.0-hf")
@@ -513,15 +516,27 @@ def phase3_got_ocr2():
         # kernel v8 dung bfloat16 cho ra output hon loan da ngon ngu, hoan toan sai (CER~55-120,
         # tuc dai gap hang chuc lan tham chieu) - nghi do loi so hoc ngam khi ep bf16 tren phan cung
         # khong ho tro dung. Doi sang float16 (T4 ho tro tot, Turing co Tensor Core fp16 that).
+        # KERNEL v9: fp16 van cho output hon loan tuong tu -> khong phai (chi) do dtype.
+        # Thu lai: (a) truyen THANG duong dan/PIL nhu vi du chinh thuc (khong .convert("RGB")
+        # thu cong truoc), (b) in kich thuoc/dtype cua pixel_values de kiem tra anh co thuc su
+        # duoc encode khong hay model dang "phot lo" anh va tu do sinh van ban (giai thich duoc
+        # kieu loi "chat lung tung, da ngon ngu" da thay).
         got_model = AutoModelForImageTextToText.from_pretrained(
             "stepfun-ai/GOT-OCR-2.0-hf", dtype=torch.float16 if device == "cuda" else torch.float32
         ).to(device)
         got_model.eval()
 
         @torch.no_grad()
-        def got_predict(path):
+        def got_predict(path, verbose=False):
             image = Image.open(path).convert("RGB")
             inputs = got_processor(image, return_tensors="pt").to(device)
+            if verbose:
+                print(f"    inputs.keys()={list(inputs.keys())}")
+                for k, v in inputs.items():
+                    if hasattr(v, "shape"):
+                        print(f"    {k}: shape={tuple(v.shape)} dtype={v.dtype}")
+                prompt_text = got_processor.tokenizer.decode(inputs["input_ids"][0])
+                print(f"    decoded prompt (input_ids truoc generate) = {prompt_text!r}")
             generate_ids = got_model.generate(
                 **inputs,
                 do_sample=False,
@@ -538,7 +553,7 @@ def phase3_got_ocr2():
         debug_preds = []
         for i in range(min(5, len(rx_test))):
             row = rx_test.iloc[i]
-            pred = got_predict(row["image_path"])
+            pred = got_predict(row["image_path"], verbose=(i == 0))
             debug_preds.append(pred)
             print(f"  ref={row['label']!r}  pred={pred!r}")
 
