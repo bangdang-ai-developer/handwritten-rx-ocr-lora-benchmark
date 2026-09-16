@@ -50,7 +50,7 @@ import numpy as np
 # ============================================================
 # CAU HINH
 # ============================================================
-CURRENT_PHASE = 5   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
+CURRENT_PHASE = 6   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
 # Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
@@ -734,6 +734,220 @@ def phase5_qwen_vl():
 
 
 # ============================================================
+# PHASE 6 — LoRA fine-tune TrOCR-large-handwritten (dong gop phuong phap chinh cho Q2)
+#
+# Da xac nhan (Phase 6 chuan bi, 16/09/2026): Training=3120 anh, Validation=780 anh, Testing=780
+# anh (KHONG phai 2808/936/936 nhu gia dinh ban dau tu mo ta "60/20/20" tren Kaggle - xem
+# results/phase6_summary.md). Test set da "dong bang" ve mat khai niem: build_manifest_kaggle_rx
+# ("Testing") va build_manifest_iam(n_sample=400, seed=42) da xac nhan tra ve CHINH XAC cung
+# 780/400 anh o ca 7 lan chay model truoc (Phase 1-5) - nen KHONG can file frozen rieng, chi can
+# goi lai dung ham nay voi cung seed la tai tao dung tap test cu.
+# ============================================================
+def phase6_finetune_trocr():
+    _pip_install("transformers==4.57.0", "accelerate", "peft", "albumentations", "opencv-python-headless")
+    import torch
+    from PIL import Image
+    import albumentations as A
+    import cv2  # noqa: F401 (can cho albumentations doc anh/border mode)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"  device = {device}")
+    if device != "cuda":
+        print("  [CANH BAO] Khong co GPU - fine-tune se rat cham/khong kha thi, nhung van thu.")
+
+    # --- Ban sao dong bo cua src/augmentation.py (ly do giu 2 ban: xem src/metrics.py) ---
+    def build_train_augmentation(elastic=True):
+        steps = [
+            A.Affine(rotate=(-5, 5), shear=(-8, 8), scale=(0.95, 1.05), p=0.7),
+            A.GaussNoise(std_range=(0.02, 0.08), p=0.3),
+            A.GaussianBlur(blur_limit=(3, 5), p=0.2),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+            A.OneOf([
+                A.Morphological(scale=(1, 2), operation="erosion", p=1.0),
+                A.Morphological(scale=(1, 2), operation="dilation", p=1.0),
+            ], p=0.3),
+        ]
+        if elastic:
+            steps.insert(1, A.ElasticTransform(alpha=30, sigma=5, p=0.3))
+        return A.Compose(steps)
+
+    def augment_pil(image, augmenter):
+        arr = np.array(image.convert("RGB"))
+        return Image.fromarray(augmenter(image=arr)["image"])
+
+    # --- Du lieu: Training (train, augmentation) + Validation subsample (theo doi trong luc train) ---
+    train_df = build_manifest_kaggle_rx("Training")
+    val_df_full = build_manifest_kaggle_rx("Validation")
+    val_df = val_df_full.sample(n=min(300, len(val_df_full)), random_state=SEED).reset_index(drop=True)
+    print(f"  train_df={len(train_df)}, val_df_full={len(val_df_full)}, val_df (subsample theo doi)={len(val_df)}")
+
+    from transformers import (
+        TrOCRProcessor, VisionEncoderDecoderModel, Seq2SeqTrainer, Seq2SeqTrainingArguments,
+        EarlyStoppingCallback, TrainerCallback,
+    )
+    from peft import LoraConfig, get_peft_model
+
+    processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
+    base_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
+    MAX_TARGET_LEN = 32
+
+    class RxTorchDataset(torch.utils.data.Dataset):
+        def __init__(self, df, augmenter=None):
+            self.df = df.reset_index(drop=True)
+            self.augmenter = augmenter
+
+        def __len__(self):
+            return len(self.df)
+
+        def __getitem__(self, idx):
+            row = self.df.iloc[idx]
+            image = Image.open(row["image_path"]).convert("RGB")
+            if self.augmenter is not None:
+                image = augment_pil(image, self.augmenter)
+            pixel_values = processor(image, return_tensors="pt").pixel_values.squeeze(0)
+            label_ids = processor.tokenizer(
+                str(row["label"]), padding="max_length", truncation=True, max_length=MAX_TARGET_LEN
+            ).input_ids
+            label_ids = [l if l != processor.tokenizer.pad_token_id else -100 for l in label_ids]
+            return {"pixel_values": pixel_values, "labels": torch.tensor(label_ids)}
+
+    def compute_metrics(pred):
+        label_ids = pred.label_ids.copy()
+        pred_ids = pred.predictions
+        pred_str = processor.batch_decode(pred_ids, skip_special_tokens=True)
+        label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
+        label_str = processor.batch_decode(label_ids, skip_special_tokens=True)
+        cers = [cer(l, p) for l, p in zip(label_str, pred_str)]
+        return {"cer": float(np.mean(cers))}
+
+    class TimeLimitCallback(TrainerCallback):
+        """Phanh an toan: Kaggle session toi da ~9h - dung huan luyen som (khong crash) neu vuot
+        nguong, de con thoi gian cho buoc danh gia frozen-test-set phia sau khong bi mat trang."""
+        def __init__(self, max_seconds):
+            self.max_seconds = max_seconds
+            self.t0 = time.time()
+
+        def on_step_end(self, args, state, control, **kwargs):
+            elapsed = time.time() - self.t0
+            if elapsed > self.max_seconds:
+                print(f"  [TimeLimitCallback] Vuot {self.max_seconds}s ({elapsed:.0f}s) - DUNG huan luyen som.")
+                control.should_training_stop = True
+            return control
+
+    lora_config = LoraConfig(
+        r=16, lora_alpha=32, lora_dropout=0.1,
+        target_modules=["query", "value", "q_proj", "v_proj"],
+        bias="none", task_type="SEQ_2_SEQ_LM",
+    )
+    model = get_peft_model(base_model, lora_config).to(device)
+    model.print_trainable_parameters()
+    n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    if n_trainable == 0:
+        # Loi PEFT hay gap: target_modules khong khop ten module thuc te -> 0 tham so LoRA nao
+        # duoc tao, "training" se chay ma khong hoc gi ca. Kiem tra NGAY, KHONG cho chay tiep.
+        names_sample = [n for n, _ in base_model.named_modules()][:80]
+        raise RuntimeError(
+            f"LoRA co 0 tham so trainable - target_modules={lora_config.target_modules} khong "
+            f"khop ten module nao trong model. 80 ten module dau: {names_sample}"
+        )
+
+    # ============================================================
+    # SMOKE TEST truoc (bai hoc Phase 3/4): vai chuc step tren subset nho, kiem tra loss huu han
+    # va giam dan truoc khi cam ket vai gio GPU cho training day du.
+    # ============================================================
+    print("\n--- SMOKE TEST: 20 step tren 64 anh train ---")
+    smoke_train = RxTorchDataset(train_df.sample(n=min(64, len(train_df)), random_state=SEED),
+                                  augmenter=build_train_augmentation(elastic=True))
+    smoke_args = Seq2SeqTrainingArguments(
+        output_dir="/kaggle/working/smoke", per_device_train_batch_size=8,
+        max_steps=20, logging_steps=5, save_strategy="no", eval_strategy="no",
+        fp16=(device == "cuda"), report_to=[],
+    )
+    smoke_trainer = Seq2SeqTrainer(model=model, args=smoke_args, train_dataset=smoke_train)
+    t0 = time.time()
+    smoke_result = smoke_trainer.train()
+    smoke_elapsed = time.time() - t0
+    loss_hist = [h["loss"] for h in smoke_trainer.state.log_history if "loss" in h]
+    print(f"  Smoke test: {smoke_elapsed:.1f}s / 20 step -> ~{smoke_elapsed/20:.2f}s/step. "
+          f"Loss history: {loss_hist}")
+    if not loss_hist or not all(np.isfinite(loss_hist)):
+        raise RuntimeError(f"Smoke test: loss khong huu han/rong ({loss_hist}) - DUNG, KHONG chay full training.")
+    if len(loss_hist) >= 2 and loss_hist[-1] > loss_hist[0] * 1.5:
+        print(f"  [CANH BAO] Loss tang thay vi giam ({loss_hist[0]:.3f} -> {loss_hist[-1]:.3f}) - "
+              f"co the learning_rate qua cao, nhung van tiep tuc full training (se theo doi eval CER).")
+    steps_per_epoch = len(train_df) / 16  # effective batch = 8 * grad_accum(2)
+    print(f"  Uoc luong: ~{steps_per_epoch:.0f} step/epoch, ~{steps_per_epoch*smoke_elapsed/20/60:.1f} phut/epoch")
+
+    # ============================================================
+    # TRAINING THAT (sau khi smoke test qua)
+    # ============================================================
+    train_ds = RxTorchDataset(train_df, augmenter=build_train_augmentation(elastic=True))
+    val_ds = RxTorchDataset(val_df, augmenter=None)
+
+    training_args = Seq2SeqTrainingArguments(
+        output_dir="/kaggle/working/trocr-lora",
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        gradient_accumulation_steps=2,
+        learning_rate=2e-4,
+        lr_scheduler_type="cosine",
+        warmup_ratio=0.08,
+        num_train_epochs=15,
+        fp16=(device == "cuda"),
+        predict_with_generate=True,
+        generation_max_length=MAX_TARGET_LEN,
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        save_total_limit=2,
+        logging_steps=20,
+        load_best_model_at_end=True,
+        metric_for_best_model="cer",
+        greater_is_better=False,
+        report_to=[],
+    )
+    trainer = Seq2SeqTrainer(
+        model=model, args=training_args,
+        train_dataset=train_ds, eval_dataset=val_ds,
+        compute_metrics=compute_metrics,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=5), TimeLimitCallback(max_seconds=5 * 3600)],
+    )
+    print("\n--- TRAINING THAT: LoRA fine-tune TrOCR-large-handwritten (r=16, alpha=32, elastic=True) ---")
+    t_train0 = time.time()
+    trainer.train()
+    print(f"  Training xong sau {time.time() - t_train0:.0f}s. Best eval CER: "
+          f"{trainer.state.best_metric}")
+
+    # Luu adapter LoRA ngay (truoc khi lam gi khac co the loi) - day la "san pham" quan trong nhat.
+    model.save_pretrained("/kaggle/working/trocr-lora-adapter")
+    processor.save_pretrained("/kaggle/working/trocr-lora-adapter")
+    print("  Da luu adapter vao /kaggle/working/trocr-lora-adapter")
+
+    # ============================================================
+    # DANH GIA TREN CA 2 FROZEN TEST SET (dung LAI CHINH XAC ham build_manifest_* nhu Phase 1-5
+    # - da xac nhan cho cung 780/400 anh moi lan goi, xem docstring Phase 6 o tren).
+    # ============================================================
+    try:
+        model.eval()
+
+        @torch.no_grad()
+        def trocr_lora_predict(path):
+            image = Image.open(path).convert("RGB")
+            pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+            ids = model.generate(pixel_values, max_new_tokens=MAX_TARGET_LEN)
+            return processor.batch_decode(ids, skip_special_tokens=True)[0]
+
+        rx_test = build_manifest_kaggle_rx("Testing")
+        iam_sub = build_manifest_iam(n_sample=400)
+        print("\n--- TrOCR-LoRA-finetuned tren Kaggle-Rx (Testing, toan bo, frozen) ---")
+        run_model_on_manifest("trocr-lora-finetuned", trocr_lora_predict, rx_test, "kaggle_rx")
+        print("\n--- TrOCR-LoRA-finetuned tren IAM (subsample 400, frozen) - kiem tra catastrophic forgetting ---")
+        run_model_on_manifest("trocr-lora-finetuned", trocr_lora_predict, iam_sub, "iam")
+    except Exception as e:
+        print(f"  [LOI khi danh gia frozen test set, nhung adapter DA duoc luu an toan o tren]: {e}")
+        traceback.print_exc()
+
+
+# ============================================================
 # MAIN
 # ============================================================
 if __name__ == "__main__":
@@ -752,5 +966,7 @@ if __name__ == "__main__":
         phase4_paddleocr_vl()
     elif CURRENT_PHASE == 5:
         phase5_qwen_vl()
-    elif CURRENT_PHASE >= 6:
+    elif CURRENT_PHASE == 6:
+        phase6_finetune_trocr()
+    elif CURRENT_PHASE >= 7:
         print(f"PHASE {CURRENT_PHASE} chua duoc them vao script nay. Xem docs/05-ke-hoach-Q2.md.")
