@@ -28,7 +28,16 @@ Bộ tài liệu này được tổng hợp để chuẩn bị cho một dự á
 
 Toàn bộ dữ liệu thô: [results/results_master_combined.csv](results/results_master_combined.csv) (8.260 dòng).
 
-**Tiếp theo:** Phase 6-8 (**LoRA fine-tune TrOCR-large-handwritten** trên 2.808 ảnh train, đánh giá cải thiện in-domain + catastrophic-forgetting trên IAM) → Phase 9-13 (phân tích thống kê + viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md). Toàn bộ pipeline chạy qua điều khiển trực tiếp Kaggle API (`kaggle kernels push/status/output`, không cần mở trình duyệt) — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py).
+**LoRA fine-tune TrOCR-large-handwritten (Phase 7-8) ĐÃ XONG** — kết quả thật, 3.120 ảnh train, so sánh paired với zero-shot (n khớp 100%, Wilcoxon signed-rank):
+
+| Dataset | CER zero-shot → fine-tuned | Exact-match | Wilcoxon p-value | Ý nghĩa |
+|---|---|---|---|---|
+| **Kaggle-Rx test (in-domain, 780 ảnh)** | 0,580 → **0,149** (−74,4%) | 8,1% → **60,0%** | p=6,4×10⁻¹¹⁰ | Cải thiện rất lớn, cực kỳ có ý nghĩa |
+| **IAM (out-of-domain, 400 ảnh)** | 0,441 → **0,524** (+18,8%, TỆ HƠN) | 57,3% → 25,8% | p=4,3×10⁻⁵ | Catastrophic forgetting có ý nghĩa thống kê |
+
+Top-1 accuracy (ánh xạ về 78 tên thuốc thật) sau fine-tune: **89,9%**. Chi tiết đầy đủ (cấu hình LoRA, lịch sử train, diễn giải song song 2 phát hiện) ở [results/phase7_summary.md](results/phase7_summary.md).
+
+**Tiếp theo:** Phase 9-13 (phân tích thống kê tổng hợp toàn bộ model + phân tích lỗi định tính + viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md). Toàn bộ pipeline chạy qua điều khiển trực tiếp Kaggle API (`kaggle kernels push/status/output`, không cần mở trình duyệt) — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py).
 
 ## Điểm mấu chốt (tóm tắt nhanh)
 
