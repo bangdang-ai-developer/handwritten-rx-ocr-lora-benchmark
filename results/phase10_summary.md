@@ -1,103 +1,92 @@
 # Phase 10 — Phân tích lỗi định tính (fine-tune sửa được loại lỗi nào, tạo ra loại lỗi nào mới)
 
-Script tái lập: `src/analyze_errors.py`. Phân loại lỗi dựa trên `results_master_combined.csv`
-(cột `exact_match`, `degenerate`, `top1_pred`/`top1_correct` có sẵn từ `src/metrics.py`), so sánh
-**trocr-large-handwritten (zero-shot)** với **trocr-lora-finetuned**, cả 2 dataset.
+> **⚠️ Cập nhật (17/09/2026):** Đã chạy lại hoàn toàn với **r=32** (cấu hình chính thức sau ablation, xem
+> `phase7b_ablation_summary.md`) thay cho r=16. Kết luận tổng thể giữ nguyên, nhưng mức độ đánh đổi an toàn
+> lâm sàng ở Mục 2 **nhẹ hơn** so với bản r=16 trước đây.
+
+Script tái lập: `src/analyze_errors.py`. Phân loại lỗi dựa trên `results_master_combined.csv`, so sánh
+**trocr-large-handwritten (zero-shot)** với **trocr-lora-finetuned (r=32)**, cả 2 dataset.
 
 ## 1. Đơn vị phân tích: 4 loại lỗi trên Kaggle-Rx (đóng, 78 tên thuốc)
 
 | Loại | Định nghĩa |
 |---|---|
 | `correct` | Khớp chuỗi chính xác (`exact_match`) |
-| `minor_ocr_noise_still_correct_drug` | Chuỗi không khớp tuyệt đối, nhưng khi ánh xạ về gần nhất trong 78 tên thuốc (`top1_pred`) thì **đúng thuốc** — lỗi chính tả không ảnh hưởng ý nghĩa lâm sàng |
-| `confusable_wrong_drug` | Sai thuốc, và bản thân chuỗi output **giống rõ một tên thuốc khác có thật** (khoảng cách edit chuẩn hoá ≤0,34 tới `top1_pred` sai) — **loại lỗi nguy hiểm nhất về mặt lâm sàng** (dễ bị đọc nhầm thành đơn thuốc hợp lệ nhưng sai) |
-| `hallucination_far_off` | Sai thuốc, và output không giống bất kỳ tên thuốc thật nào (không degenerate, nhưng cũng không phải near-miss) — dễ bị người đọc/dược sĩ phát hiện là "rõ ràng sai" |
+| `minor_ocr_noise_still_correct_drug` | Chuỗi không khớp tuyệt đối, nhưng ánh xạ về gần nhất trong 78 tên thuốc thì **đúng thuốc** |
+| `confusable_wrong_drug` | Sai thuốc, và output **giống rõ một tên thuốc khác có thật** (khoảng cách edit chuẩn hoá ≤0,34) — **loại lỗi nguy hiểm nhất về mặt lâm sàng** |
+| `hallucination_far_off` | Sai thuốc, và output không giống bất kỳ tên thuốc thật nào |
 
 ## 2. Kết quả — Kaggle-Rx (in-domain)
 
-| Loại lỗi | Zero-shot | Fine-tuned | Thay đổi |
-|---|---|---|---|
-| `correct` | 8,08% | **60,00%** | +51,9 điểm % |
-| `minor_ocr_noise_still_correct_drug` | 71,79% | 30,77% | −41,0 điểm % |
-| `hallucination_far_off` | 18,59% | **5,77%** | −12,8 điểm % (giảm ~3,2 lần) |
-| `confusable_wrong_drug` | 1,54% | **3,46%** | **+1,9 điểm % (tăng ~2,2 lần)** |
+| Loại lỗi | Zero-shot | Fine-tuned (r=32) | Thay đổi | (so với r=16 trước đây) |
+|---|---|---|---|---|
+| `correct` | 8,08% | **68,08%** | +60,0 điểm % | (r=16: 60,00%) |
+| `minor_ocr_noise_still_correct_drug` | 71,79% | 24,87% | −47,0 điểm % | (r=16: 30,77%) |
+| `hallucination_far_off` | 18,59% | **4,49%** | −14,1 điểm % (giảm ~4,1 lần) | (r=16: 5,77%, giảm ~3,2 lần) |
+| `confusable_wrong_drug` | 1,54% | **2,56%** | +1,0 điểm % (tăng ~1,7 lần) | (r=16: 3,46%, tăng ~2,2 lần) |
 
-**Diễn giải chính:**
-- Fine-tuning không chỉ giảm CER trung bình — nó **dịch chuyển hẳn phân phối lỗi**: phần lớn trường hợp
-  trước đây "đúng thuốc nhưng chính tả nhiễu" (71,8%) nay trở thành **khớp chính xác hoàn toàn** (60%),
-  và quan trọng hơn, **lỗi sai-hoàn-toàn-không-giống-gì (hallucination) giảm mạnh** (18,6%→5,8%) — mô hình
-  ít "đoán bừa" hơn hẳn sau khi thấy đủ ví dụ thật.
-- **Phát hiện cần cảnh báo cho phần Thảo luận/An toàn lâm sàng**: tỷ lệ lỗi `confusable_wrong_drug`
-  (output giống hệt MỘT tên thuốc khác có thật) tăng gần gấp đôi (1,54%→3,46%). Điều này hợp logic: khi
-  model học được "hình dạng" chung của 78 tên thuốc thật, phần lỗi còn sót lại có xu hướng rơi vào không
-  gian "trông giống thuốc thật" thay vì "rõ ràng vô nghĩa". Về mặt an toàn: lỗi loại `hallucination_far_off`
-  dễ bị dược sĩ/nhân viên y tế phát hiện ngay ("chữ này không phải tên thuốc nào cả"), trong khi
-  `confusable_wrong_drug` (ví dụ đơn thuốc ghi "Amodis" bị đọc thành "Axodin" — cả hai đều là thuốc thật)
-  **nguy hiểm hơn vì trông hợp lý, khó bị nghi ngờ khi kiểm tra thủ công**. Đây là lý do một hệ thống OCR y
-  khoa thực tế **không nên chỉ tối ưu CER trung bình**, mà cần đo riêng loại lỗi "sound-alike/look-alike
-  giữa các thuốc thật" — gợi ý hướng cải tiến tương lai: thêm loss/metric phạt nặng riêng cho nhầm lẫn giữa
-  các cặp thuốc dễ nhầm (đã biết trong dược học là "confusable drug names", ví dụ FDA có danh sách riêng
-  cho vấn đề này).
+**Diễn giải chính:** cùng xu hướng như r=16 — fine-tuning dịch chuyển phân phối lỗi mạnh về phía "đúng hoàn
+toàn" và giảm hẳn lỗi đoán bừa, nhưng **tăng nhẹ** tỷ lệ lỗi giống-thuốc-khác. Tuy nhiên r=32 có mức đánh đổi
+**NHẸ HƠN r=16 trên cả 2 chiều**: giảm hallucination mạnh hơn (4,1 lần so với 3,2 lần) VÀ tăng confusable ít
+hơn (tăng 1,7 lần so với 2,2 lần) — r=32 vừa cải thiện in-domain mạnh hơn, vừa có hồ sơ an toàn tốt hơn r=16,
+không có đánh đổi giữa 2 mục tiêu này.
 
-### Ví dụ cụ thể (fine-tuned model, kaggle_rx)
+**Vẫn cần cảnh báo cho Thảo luận/An toàn lâm sàng**: dù nhẹ hơn r=16, tỷ lệ `confusable_wrong_drug` vẫn
+**tăng so với zero-shot** (1,54%→2,56%) — kết luận về nguyên lý (lỗi còn sót lại có xu hướng "giống thuốc
+thật" hơn là "rõ ràng vô nghĩa" khi model học tốt hơn) **vẫn đúng**, chỉ khác về độ lớn.
+
+### Ví dụ cụ thể (fine-tuned r=32, kaggle_rx)
 
 | reference | hypothesis | top1_pred (gần nhất) | CER | Loại |
 |---|---|---|---|---|
 | Amodis | Amodin | Axodin | 0,167 | confusable_wrong_drug |
-| Backtone | Baczin | Bicozin | 0,500 | confusable_wrong_drug |
-| Bacmax | Bucmon | Baclon | 0,500 | confusable_wrong_drug |
-| Beklo | Bexo | Fexo | 0,400 | confusable_wrong_drug |
-| Ace | Aen | Tamen | 0,667 | hallucination_far_off |
-| Bacaid | Berc | Beklo | 0,833 | hallucination_far_off |
-| Aceta | Acata | Aceta | 0,200 | minor_ocr_noise_still_correct_drug (top1 vẫn đúng) |
+| Dinafex | Fixal | Fixal | 0,714 | confusable_wrong_drug (output khớp đúng 1 thuốc khác) |
+| Etizin | Eitrin | Zithrin | 0,500 | confusable_wrong_drug |
+| Alatrol | KKKKK | Beklo | 1,000 | hallucination_far_off |
+| Bacmax | Bac | Baclon | 0,500 | hallucination_far_off |
+| Aceta | Acata | Aceta | 0,200 | minor_ocr_noise_still_correct_drug |
 
-Quan sát thêm: nhóm tên thuốc bắt đầu bằng "Bac-" (Bacaid, Backtone, Baclofen, Baclon, Bacmax) là điểm
-nghẽn khó nhất — các thuốc này rất giống nhau về hình dạng chữ, cả zero-shot lẫn fine-tuned đều nhầm lẫn
-nội bộ trong nhóm này, đúng bản chất bài toán "confusable drug names" nêu trên.
+Nhóm tên thuốc "Bac-" (Bacaid, Backtone, Baclofen, Baclon, Bacmax) vẫn là điểm nghẽn khó nhất, nhất quán
+với phát hiện ở bản r=16.
 
 ## 3. Kết quả — IAM (out-of-domain, chữ viết tay tổng quát)
 
-| Mức lỗi (theo CER) | Zero-shot | Fine-tuned | Thay đổi |
+| Mức lỗi (theo CER) | Zero-shot | Fine-tuned (r=32) | (so với r=16 trước đây) |
 |---|---|---|---|
-| `correct` (exact match) | 57,25% | 25,75% | −31,5 điểm % |
-| `minor_error` (0<CER≤0,3) | 6,75% | 13,50% | +6,8 điểm % |
-| `moderate_error` (0,3<CER≤0,7) | 12,75% | **32,00%** | +19,3 điểm % |
-| `severe_error` (CER>0,7) | 23,25% | 28,75% | +5,5 điểm % |
+| `correct` (exact match) | 57,25% | 26,75% | (r=16: 25,75%) |
+| `minor_error` (0<CER≤0,3) | 6,75% | 13,00% | (r=16: 13,50%) |
+| `moderate_error` (0,3<CER≤0,7) | 12,75% | **32,75%** | (r=16: 32,00%) |
+| `severe_error` (CER>0,7) | 23,25% | 27,50% | (r=16: 28,75%) |
 
-**Diễn giải:** khác với giả thuyết ban đầu ("model có thể vỡ hoàn toàn trên domain khác"), dữ liệu cho thấy
-bức tranh **tinh vi hơn**: catastrophic forgetting ở đây **không phải sụp đổ toàn phần** (severe_error chỉ
-tăng nhẹ +5,5 điểm %), mà chủ yếu là **một khối lớn từ trước đây đọc đúng tuyệt đối nay bị dịch sang lỗi
-mức trung bình** (`moderate_error` tăng gần gấp 2,5 lần, từ 12,75% lên 32%). Nói cách khác: fine-tune trên
-domain hẹp làm model "mất đi sự chính xác tuyệt đối" trên chữ viết tay tổng quát nhiều hơn là làm nó "hỏng
-hoàn toàn" — khớp với quan sát median CER tăng từ 0 lên 0,429 đã nêu ở Phase 9.
+**Diễn giải không đổi**: catastrophic forgetting biểu hiện chủ yếu qua dịch chuyển "đúng tuyệt đối" sang
+"lỗi mức trung bình", không phải sụp đổ toàn phần — r=32 có phân bố gần như tương đương r=16, chỉ nhẹ hơn
+một chút ở severe_error (27,50% so với 28,75%).
 
-## 4. Kiểm tra an toàn quan trọng: model fine-tuned có "rò rỉ" tên thuốc khi đọc chữ thường (IAM) không?
+## 4. Kiểm tra an toàn: model fine-tuned có "rò rỉ" tên thuốc khi đọc chữ thường (IAM) không?
 
-Đây là câu hỏi an toàn cụ thể: liệu việc fine-tune trên 78 tên thuốc có khiến model **hay "nhớ nhầm" ra tên
-thuốc** ngay cả khi đang đọc một từ tiếng Anh thông thường không liên quan (một dạng lỗi rất đáng lo nếu
-model này được dùng ngoài phạm vi đơn thuốc)? Kiểm tra: đếm số dự đoán trên IAM khớp *chính xác* với 1 trong
-78 tên thuốc trong khi nhãn thật không phải vậy (CER>0,3 so với nhãn thật).
+**Kết quả: 2/400 (0,5%)** (so với 1/400 = 0,25% ở r=16, và 0/400 ở zero-shot) — vẫn ở mức **rất thấp/không
+đáng kể**, hai trường hợp:
+- nhãn thật "at" (2 ký tự) bị đọc thành "Az" (trùng tên thuốc "Az" trong vocab) — nhiều khả năng trùng hợp
+  ngẫu nhiên trên từ ngắn, giống pattern đã thấy ở r=16.
+- nhãn thật "reason" bị đọc thành "Nexum" — CER=0,833, khác biệt lớn, có thể là 1 trường hợp thật của việc
+  model "nhớ nhầm" ra tên thuốc khi gặp từ dài/khó đọc, nhưng chỉ 1/400 nên không đủ để kết luận đây là hiện
+  tượng hệ thống.
 
-**Kết quả: chỉ 1/400 (0,25%)** — và trường hợp duy nhất đó là nhãn thật "a" (1 ký tự) bị đọc thành "az" (2
-ký tự, trùng với tên thuốc "Az" trong vocab), nhiều khả năng là trùng hợp ngẫu nhiên với 1 từ ngắn mơ hồ hơn
-là bằng chứng "rò rỉ" thật sự. Zero-shot có tỷ lệ nền là 0/400 (0%). **Kết luận: không có bằng chứng đáng kể
-cho hiện tượng "rò rỉ tên thuốc"** — đây là một kết quả âm tính đáng báo cáo (loại trừ trước một mối lo ngại
-an toàn cụ thể mà phản biện có thể nêu ra).
+**Kết luận không đổi**: không có bằng chứng đáng kể cho hiện tượng "rò rỉ tên thuốc" ở quy mô ảnh hưởng tới
+kết luận chung, dù tỷ lệ tăng nhẹ (1 → 2 trường hợp) khi đổi từ r=16 sang r=32 — đáng ghi chú như 1 quan sát
+nhỏ trong Limitations, không phải một finding chính.
 
 ## 5. Tóm tắt cho bài báo
 
-1. Fine-tuning dịch chuyển phân phối lỗi trên domain mục tiêu theo hướng tích cực rõ rệt: giảm mạnh lỗi
-   "đoán bừa" (hallucination_far_off, −12,8 điểm %), nhưng tăng nhẹ tỷ lệ lỗi "giống thuốc khác thật"
-   (confusable_wrong_drug, +1,9 điểm %) — cần thảo luận như một đánh đổi an toàn lâm sàng tinh vi, không chỉ
-   nhìn CER trung bình.
-2. Catastrophic forgetting trên IAM biểu hiện chủ yếu qua việc dịch chuyển khối lớn "đúng tuyệt đối" sang
-   "lỗi mức trung bình", không phải sụp đổ hoàn toàn — một phát hiện có sắc thái hơn so với chỉ nhìn CER
-   trung bình tăng ở Phase 7-9.
-3. Không tìm thấy bằng chứng "rò rỉ" tên thuốc khi model đọc chữ viết tay tổng quát ngoài domain — kết quả
-   âm tính hữu ích, giúp giới hạn phạm vi lo ngại về an toàn của phát hiện catastrophic forgetting.
+1. Fine-tuning (r=32) dịch chuyển phân phối lỗi trên domain mục tiêu theo hướng tích cực rõ rệt hơn cả r=16:
+   giảm hallucination_far_off mạnh hơn (4,1 lần) và tăng confusable_wrong_drug ít hơn (1,7 lần) — r=32 có hồ
+   sơ an toàn tốt hơn r=16 trên đúng chiều đo này, không chỉ tốt hơn về CER trung bình.
+2. Catastrophic forgetting trên IAM: bức tranh gần như không đổi so với r=16 (dịch từ "đúng tuyệt đối" sang
+   "lỗi trung bình" là hiệu ứng chính, không phải sụp đổ hoàn toàn).
+3. Không tìm thấy bằng chứng "rò rỉ" tên thuốc có ý nghĩa hệ thống ở cả r=16 và r=32.
 
 ## 6. Việc còn lại
 
 - Phase 11 (tuỳ chọn): kiểm tra bổ sung RxHandBD.
 - Phase 12-13: viết bài theo cấu trúc tạp chí (PeerJ Computer Science), nộp arXiv trước, sau đó nộp chính
-  thức — tổng hợp toàn bộ Phase 1-10 làm phần Kết quả + Thảo luận.
+  thức — tổng hợp toàn bộ Phase 1-10 (bao gồm ablation Phase 7b) làm phần Kết quả + Thảo luận.

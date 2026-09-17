@@ -1,5 +1,13 @@
 # Phase 7b — Ablation: LoRA rank (8/16/32) và augmentation A/B (elastic on/off)
 
+> **✅ QUYẾT ĐỊNH ĐÃ THỰC HIỆN (17/09/2026):** Đã chọn **r=32 làm cấu hình chính thức** của toàn bài báo
+> (phương án 1 ở Mục 3). Đã đổi tên trong `results_master_combined.csv` (`trocr-lora-finetuned` = r=32;
+> r=16 gốc đổi tên thành `trocr-lora-r16`), chạy lại `analyze_aggregate.py`/`analyze_errors.py`/
+> `generate_figures.py`, và viết lại `phase7_summary.md`, `phase9_summary.md`, `phase10_summary.md`,
+> README.md theo r=32. Adapter r=16 (cũ) di chuyển sang `results/trocr-lora-adapter-r16-superseded/`;
+> adapter r=32 (mới, chính thức) ở `results/trocr-lora-adapter-final/`. Bảng ablation dưới đây giữ nguyên
+> không đổi (đây chính là dữ liệu dẫn tới quyết định trên).
+
 Script tái lập: `src/analyze_ablation.py`. Cả 4 cấu hình đều train **full** (không phải quick-compare
 như kế hoạch gốc dự tính) — kernel v20 (main, r=16+elastic), v21 (r=8), v22 (r=32), v23 (r=16, không elastic)
 — cùng seed=42, cùng 3.120 ảnh train, cùng frozen test set (780 kaggle_rx + 400 iam), so sánh **paired**.
