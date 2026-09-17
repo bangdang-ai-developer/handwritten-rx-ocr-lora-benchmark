@@ -49,6 +49,14 @@ catastrophic forgetting chủ yếu là dịch chuyển từ "đúng tuyệt đ�
 đổ hoàn toàn; kiểm tra riêng cho thấy **không có bằng chứng "rò rỉ" tên thuốc** khi model đọc chữ viết tay
 tổng quát (0,25% trên IAM, gần như trùng hợp ngẫu nhiên). Chi tiết + ví dụ cụ thể ở [results/phase10_summary.md](results/phase10_summary.md), script tái lập ở [src/analyze_errors.py](src/analyze_errors.py).
 
+**Ablation (Phase 7b) ĐÃ XONG** — chạy full training cho r=8/16/32 (elastic=True) + r=16 không-elastic.
+**Phát hiện quan trọng: r=16 (cấu hình "main" ban đầu) KHÔNG phải rank tốt nhất** — cả r=8 và r=32 đều vượt
+r=16 có ý nghĩa thống kê mạnh trên kaggle_rx (CER 0,113/0,114 vs 0,149, p<10⁻⁶), và **r=32 tốt nhất trên cả 2
+tiêu chí** (kaggle_rx VÀ giữ tổng quát hoá IAM tốt nhất, không đánh đổi). Augmentation elastic: không ảnh
+hưởng in-domain, có xu hướng (chưa đạt ý nghĩa 0,05) giảm nhẹ forgetting. Chi tiết + khuyến nghị (đổi model
+chính sang r=32?) ở [results/phase7b_ablation_summary.md](results/phase7b_ablation_summary.md) — **đang chờ
+quyết định của bạn** trước khi viết lại Phase 9/10 với r=32.
+
 **Tiếp theo:** Phase 11 (tuỳ chọn, RxHandBD) → Phase 12-13 (viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md). Toàn bộ pipeline chạy qua điều khiển trực tiếp Kaggle API (`kaggle kernels push/status/output`, không cần mở trình duyệt) — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py).
 
 ## Điểm mấu chốt (tóm tắt nhanh)
