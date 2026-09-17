@@ -53,6 +53,17 @@ import numpy as np
 CURRENT_PHASE = 6   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
                      # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
 
+# Chon cau hinh ablation se chay khi CURRENT_PHASE == 6 (moi kernel push chay 1 cau hinh,
+# doi ABLATION_CONFIG roi push kernel moi cho cau hinh tiep theo - xem results/phase7b_ablation_summary.md).
+# "main" (r=16, elastic=True) DA CHAY XONG (kernel v20) - khong can chay lai.
+ABLATION_CONFIG = "r32"   # "main" | "r8" | "r32" | "r16_noelastic"
+_ABLATION_PRESETS = {
+    "main":          dict(lora_r=16, lora_alpha=32, use_elastic=True,  run_name="trocr-lora-finetuned"),
+    "r8":            dict(lora_r=8,  lora_alpha=16, use_elastic=True,  run_name="trocr-lora-r8"),
+    "r32":           dict(lora_r=32, lora_alpha=64, use_elastic=True,  run_name="trocr-lora-r32"),
+    "r16_noelastic": dict(lora_r=16, lora_alpha=32, use_elastic=False, run_name="trocr-lora-r16-noelastic"),
+}
+
 # Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
 RUN_TROCR = False           # da co ket qua tot o results_master_phase2.csv (kernel v6) - khong can chay lai
 RUN_DONUT_RAW_FULL = False  # da co ket qua (that bai gan 100%) o kernel v6 - chi chay lai PADDED lan nay
@@ -743,7 +754,10 @@ def phase5_qwen_vl():
 # 780/400 anh o ca 7 lan chay model truoc (Phase 1-5) - nen KHONG can file frozen rieng, chi can
 # goi lai dung ham nay voi cung seed la tai tao dung tap test cu.
 # ============================================================
-def phase6_finetune_trocr():
+def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="trocr-lora-finetuned"):
+    print(f"\n=== phase6_finetune_trocr: lora_r={lora_r}, lora_alpha={lora_alpha}, "
+          f"use_elastic={use_elastic}, run_name={run_name!r} ===")
+    output_subdir = run_name.replace("trocr-lora-finetuned", "trocr-lora")  # giu duong dan cu cho cau hinh "main"
     # torchao>=0.16.0 bat buoc: Kaggle base image co san torchao==0.10.0 (cu), peft moi nhat
     # tu choi chay voi ban cu (kernel v14: ImportError). Ep nang cap torchao cung luc.
     _pip_install("transformers==4.57.0", "accelerate", "peft", "torchao>=0.16.0",
@@ -864,7 +878,7 @@ def phase6_finetune_trocr():
             return control
 
     lora_config = LoraConfig(
-        r=16, lora_alpha=32, lora_dropout=0.1,
+        r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.1,
         target_modules=["query", "value", "q_proj", "v_proj"],
         bias="none", task_type="SEQ_2_SEQ_LM",
     )
@@ -894,9 +908,9 @@ def phase6_finetune_trocr():
     # ============================================================
     print("\n--- SMOKE TEST: 20 step tren 64 anh train ---")
     smoke_train = RxTorchDataset(train_df.sample(n=min(64, len(train_df)), random_state=SEED),
-                                  augmenter=build_train_augmentation(elastic=True))
+                                  augmenter=build_train_augmentation(elastic=use_elastic))
     smoke_args = Seq2SeqTrainingArguments(
-        output_dir="/kaggle/working/smoke", per_device_train_batch_size=8,
+        output_dir=f"/kaggle/working/smoke-{output_subdir}", per_device_train_batch_size=8,
         max_steps=20, logging_steps=5, save_strategy="no", eval_strategy="no",
         fp16=(device == "cuda"), report_to=[],
     )
@@ -918,11 +932,11 @@ def phase6_finetune_trocr():
     # ============================================================
     # TRAINING THAT (sau khi smoke test qua)
     # ============================================================
-    train_ds = RxTorchDataset(train_df, augmenter=build_train_augmentation(elastic=True))
+    train_ds = RxTorchDataset(train_df, augmenter=build_train_augmentation(elastic=use_elastic))
     val_ds = RxTorchDataset(val_df, augmenter=None)
 
     training_args = Seq2SeqTrainingArguments(
-        output_dir="/kaggle/working/trocr-lora",
+        output_dir=f"/kaggle/working/{output_subdir}",
         per_device_train_batch_size=8,
         per_device_eval_batch_size=8,
         gradient_accumulation_steps=2,
@@ -948,16 +962,18 @@ def phase6_finetune_trocr():
         compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=5), TimeLimitCallback(max_seconds=5 * 3600)],
     )
-    print("\n--- TRAINING THAT: LoRA fine-tune TrOCR-large-handwritten (r=16, alpha=32, elastic=True) ---")
+    print(f"\n--- TRAINING THAT: LoRA fine-tune TrOCR-large-handwritten "
+          f"(r={lora_r}, alpha={lora_alpha}, elastic={use_elastic}) ---")
     t_train0 = time.time()
     trainer.train()
     print(f"  Training xong sau {time.time() - t_train0:.0f}s. Best eval CER: "
           f"{trainer.state.best_metric}")
 
     # Luu adapter LoRA ngay (truoc khi lam gi khac co the loi) - day la "san pham" quan trong nhat.
-    model.save_pretrained("/kaggle/working/trocr-lora-adapter")
-    processor.save_pretrained("/kaggle/working/trocr-lora-adapter")
-    print("  Da luu adapter vao /kaggle/working/trocr-lora-adapter")
+    adapter_dir = f"/kaggle/working/{output_subdir}-adapter"
+    model.save_pretrained(adapter_dir)
+    processor.save_pretrained(adapter_dir)
+    print(f"  Da luu adapter vao {adapter_dir}")
 
     # ============================================================
     # DANH GIA TREN CA 2 FROZEN TEST SET (dung LAI CHINH XAC ham build_manifest_* nhu Phase 1-5
@@ -978,10 +994,10 @@ def phase6_finetune_trocr():
 
         rx_test = build_manifest_kaggle_rx("Testing")
         iam_sub = build_manifest_iam(n_sample=400)
-        print("\n--- TrOCR-LoRA-finetuned tren Kaggle-Rx (Testing, toan bo, frozen) ---")
-        run_model_on_manifest("trocr-lora-finetuned", trocr_lora_predict, rx_test, "kaggle_rx")
-        print("\n--- TrOCR-LoRA-finetuned tren IAM (subsample 400, frozen) - kiem tra catastrophic forgetting ---")
-        run_model_on_manifest("trocr-lora-finetuned", trocr_lora_predict, iam_sub, "iam")
+        print(f"\n--- {run_name} tren Kaggle-Rx (Testing, toan bo, frozen) ---")
+        run_model_on_manifest(run_name, trocr_lora_predict, rx_test, "kaggle_rx")
+        print(f"\n--- {run_name} tren IAM (subsample 400, frozen) - kiem tra catastrophic forgetting ---")
+        run_model_on_manifest(run_name, trocr_lora_predict, iam_sub, "iam")
     except Exception as e:
         print(f"  [LOI khi danh gia frozen test set, nhung adapter DA duoc luu an toan o tren]: {e}")
         traceback.print_exc()
@@ -1007,6 +1023,6 @@ if __name__ == "__main__":
     elif CURRENT_PHASE == 5:
         phase5_qwen_vl()
     elif CURRENT_PHASE == 6:
-        phase6_finetune_trocr()
+        phase6_finetune_trocr(**_ABLATION_PRESETS[ABLATION_CONFIG])
     elif CURRENT_PHASE >= 7:
         print(f"PHASE {CURRENT_PHASE} chua duoc them vao script nay. Xem docs/05-ke-hoach-Q2.md.")
