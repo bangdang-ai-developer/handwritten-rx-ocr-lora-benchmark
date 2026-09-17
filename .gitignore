@@ -6,6 +6,7 @@ data/*
 results/*.csv
 !results/frozen_test_manifest_*.csv
 results/*.png
+!results/figures/*.png
 results/augmentation_preview/
 .ipynb_checkpoints/
 *.egg-info/
