@@ -1,8 +1,12 @@
 """Data augmentation for LoRA fine-tuning TrOCR-large-handwritten on the Kaggle-Rx
 handwritten-prescription train split (3,120 images - small, needs augmentation to avoid
-overfitting). Choices grounded in evidence from Ali et al. (arXiv:2412.18199) and
-Aradillas et al. (arXiv:1804.01527) - both fine-tune HTR models on similarly small
-(~1k-2.8k image) sets; see docs/05-ke-hoach-Q2.md Section 3.2 for the full rationale.
+overfitting). Standard HTR augmentation techniques (affine, elastic distortion, noise/blur,
+morphological erosion-dilation). Small-dataset TrOCR fine-tuning on prescription-scale data is
+independently shown to work by Ali et al. (arXiv:2412.18199, Mask R-CNN + TrOCR on ~1k
+Pakistani prescriptions - NOT an augmentation-methodology paper, cited only as precedent that
+fine-tuning TrOCR at this data scale reaches strong CER) and Aradillas et al. (arXiv:1804.01527,
+ICFHR 2018, transfer learning for small HTR datasets); see docs/05-ke-hoach-Q2.md Section 3.2
+for the full rationale and citation caveats.
 
 Kept in sync with the copy embedded in notebooks/kaggle_benchmark.py for the actual
 Kaggle training run (same reason src/metrics.py has a synced copy there).

@@ -83,7 +83,15 @@ Trả lời trực tiếp câu hỏi bạn nêu: **dùng nguyên `Validation` sp
 **Test set phải được ĐÓNG BĂNG (freeze) làm điểm neo bất biến**: đây là điểm quan trọng nhất về mặt phương pháp luận — model đã chạy zero-shot ở Phase 1/2 trên đúng bộ ảnh Testing (780 ảnh resolve được), nên khi fine-tune xong, **phải re-evaluate trên chính xác cùng 780 ảnh đó** (không phải 936 ảnh lý thuyết, không phải random lại) để phép so sánh trước/sau là *paired* hợp lệ (Wilcoxon signed-rank yêu cầu đúng từng cặp ảnh giống nhau). Hành động cụ thể: lưu list `image_path` đã dùng ở Phase 1/2 thành 1 file JSON/CSV bất biến (ví dụ `results/frozen_test_manifest_kaggle_rx.csv`, `results/frozen_test_manifest_iam.csv`) ngay khi bắt đầu Phase fine-tune, dùng lại đúng file này cho mọi lần eval sau.
 
 ### 3.2. Augmentation (chống overfitting trên 2.808 ảnh)
-Theo bằng chứng cụ thể đã có (Ali et al. 2412.18199; Aradillas et al. 1804.01527), dùng **Albumentations**, kết hợp:
+> **⚠️ SỬA TRÍCH DẪN (17/09/2026):** đã kiểm tra lại qua research agent — Ali et al. (arXiv:2412.18199)
+> **KHÔNG phải bài về phương pháp augmentation** (đó là bài về trích xuất tên thuốc bằng Mask R-CNN +
+> TrOCR-Base trên ~1.000 đơn thuốc Pakistan, xem trích dẫn đầy đủ ở Mục 3.2 bên dưới/`docs/04-...`) — chỉ
+> nên dùng làm bằng chứng "fine-tune TrOCR ở quy mô dữ liệu tương tự vẫn ra CER tốt", KHÔNG dùng để biện
+> minh riêng cho lựa chọn augmentation (elastic/affine/...). Các kỹ thuật augmentation bên dưới là thực
+> hành chuẩn phổ biến trong HTR nói chung, không gắn riêng với 1 bài báo cụ thể nào. Đã sửa docstring
+> tương ứng trong `src/augmentation.py`.
+
+Dùng **Albumentations**, kết hợp các kỹ thuật augmentation chuẩn trong HTR:
 - Elastic distortion (nhẹ-vừa) — TrOCR-**large** nhiều khả năng hưởng lợi từ elastic (khác với bản small).
 - Random rotation ±3–5°, shear nhẹ.
 - Gaussian noise/blur.
@@ -188,6 +196,7 @@ Theo bằng chứng cụ thể đã có (Ali et al. 2412.18199; Aradillas et al.
 | 6 | **Bị reviewer bắt lỗi overclaim** (78 lớp closed-vocabulary, dữ liệu fine-tune quá nhỏ dễ overfit vào đúng 78 tên thuốc thay vì học "đọc chữ viết tay" tổng quát) | Xử lý trước trong Limitations: nêu rõ ranh giới giữa "cải thiện nhận dạng chữ viết tay nói chung" và "cải thiện ghi nhớ closed-vocabulary 78 lớp cụ thể" — đây là lý do chính đánh giá thêm trên IAM (Mục 3, 4) là bắt buộc chứ không phải tuỳ chọn |
 | 7 | **Trễ tiến độ tổng thể** (dồn lỗi kỹ thuật ở nhiều phase) | Thứ tự cắt giảm nếu cần rút về 3 tuần: (a) bỏ nhánh Qwen-VL bonus API, (b) bỏ ablation rank 8/32 (giữ mỗi rank 16), (c) bỏ RxHandBD supplementary, (d) rút gọn Related Work — **không được cắt** phần đánh giá lại trên IAM sau fine-tune (đây là lõi đóng góp mới nhất so với kế hoạch gốc) |
 | 8 | **DLoRA/DoRA escalation không kịp thời gian** | Đã đánh dấu từ đầu là thí nghiệm bổ sung (Mục 2) — bỏ hoàn toàn không ảnh hưởng đóng góp chính (LoRA rank 16 cơ bản đã đủ để trả lời câu hỏi nghiên cứu) |
+| 9 **(mới, 17/09/2026)** | **Rủi ro overlap novelty**: "RxScribe Bench" (arXiv:2609.13280, 09/2026) benchmark VLM tổng quát trên đơn thuốc viết tay — cùng khung bài toán | Đã kiểm tra kỹ (xem `docs/06-tai-lieu-tham-khao-xac-minh.md` Mục 4): dùng dataset **riêng tư** (không công khai), không có phần LoRA fine-tune/catastrophic-forgetting — khác biệt đủ rõ để không mất tính mới, nhưng **BẮT BUỘC phải trích dẫn và phân biệt rõ** trong Related Work ở Phase 12, nếu không dễ bị reviewer bắt lỗi "thiếu related work gần nhất" |
 
 ---
 
@@ -328,7 +337,7 @@ Bằng chứng cụ thể từ 2 nguồn:
 
 2. **Aradillas, Murillo-Fuentes & Olmos, "Boosting Handwriting Text Recognition in Small Databases with Transfer Learning"** (arXiv 1804.01527) — bằng chứng kinh điển nhất về "transfer learning cứu tập dữ liệu nhỏ": với chỉ **350 dòng huấn luyện**, train from scratch CER = **18,2%**, còn dùng transfer learning (pretrain trên IAM 13k dòng rồi fine-tune) CER = **3,3%** — cải thiện tuyệt đối ~15 điểm CER, tương đương giảm ~82%. Với 150 dòng, CER vẫn giữ ở mức 5,8-9,4% nhờ transfer learning (so với overfit hoàn toàn nếu train from scratch).
 
-3. **DLoRA-TrOCR** (arXiv 2404.12734) — bằng chứng rằng **LoRA cụ thể** (không chỉ full fine-tune) đủ mạnh: chỉ 0,7% tham số huấn luyện, đạt CER 4,02% trên IAM, F1 94,29% trên SROIE, vượt các phương pháp PEFT khác — chứng minh LoRA không đánh đổi nhiều hiệu năng so với full fine-tune.
+3. **DLoRA-TrOCR** (Chang & Li, arXiv 2404.12734) — bằng chứng rằng **LoRA cụ thể** (không chỉ full fine-tune) đủ mạnh: chỉ 0,7% tham số huấn luyện, đạt CER 4,02% trên IAM, F1 94,29% trên SROIE, vượt các phương pháp PEFT khác — chứng minh LoRA không đánh đổi nhiều hiệu năng so với full fine-tune. **⚠️ Cập nhật trích dẫn (17/09/2026):** bài này đã được bình duyệt và xuất bản tại **ICONIP 2024** (Springer LNCS vol. 15294, DOI 10.1007/978-981-96-6599-0_2) với **tựa đề mới**: *"Mixed Text Recognition with Efficient Parameter Fine-Tuning and Transformer"* — nên trích dẫn bản Springer/ICONIP (đã bình duyệt) thay vì chỉ ghi "arXiv preprint" trong bài báo.
 
 4. **"Structure-Aware Text Recognition for Ancient Greek Critical Editions"** (arXiv 2603.02803) — bằng chứng gần đây (2026) với model lớn hơn: Qwen3-VL-8B fine-tune trên dữ liệu chữ viết chuyên biệt hẹp, CER giảm từ **5,2% (zero-shot) → 2,1% (fine-tune trên dữ liệu thật) → 1,0% (kết hợp synthetic+real)** — domain khác (Hy Lạp cổ, không phải y khoa) nhưng cùng luận điểm "VLM tổng quát cải thiện mạnh sau fine-tune trên script/domain hẹp", có thể trích dẫn làm bằng chứng bổ sung nếu bạn thử nhánh Qwen-VL.
 
