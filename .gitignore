@@ -10,3 +10,9 @@ results/*.png
 results/augmentation_preview/
 .ipynb_checkpoints/
 *.egg-info/
+paper/*.pdf
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out

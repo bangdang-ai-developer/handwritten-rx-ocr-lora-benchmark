@@ -40,9 +40,7 @@
 \vspace{6pt}
 \begin{quote}
 \small\textit{Note to author, remove before submission: confirm the name/affiliation string above and add
-an ORCID if available. Two references in the bibliography (RxScribe Bench author list; Chen et al.,
-IEEE/ACM TASLP full citation) are marked as unconfirmed and must be verified against the primary source
-before this manuscript is finalized.}
+an ORCID if available.}
 \end{quote}
 
 \begin{abstract}
@@ -96,11 +94,9 @@ That diversification leaves a fairly ordinary practical question unanswered: for
 a prescription-reading system today, which of these approaches works, and is it worth fine-tuning a smaller
 specialist model rather than simply prompting a large general VLM? We are not aware of a published study
 that benchmarks this particular mix --- classical OCR, specialist HTR transformers, an OCR-free document
-model, and current-generation general VLMs --- on a \textit{public} prescription dataset. The nearest
-comparable work, RxScribe Bench \citep{RxScribeBench2026}, evaluates frontier VLMs on handwritten
-prescriptions but does so on a newly collected \textit{private} dataset and does not test fine-tuning. As
-far as we can tell, ours is the first study to combine a fully public dataset, this specific model lineup,
-and a lightweight fine-tuning step with an explicit check of how much general handwriting ability it costs.
+model, and current-generation general VLMs --- on a \textit{public} prescription dataset, let alone couples
+that benchmark with a lightweight fine-tuning step and an explicit check of how much general handwriting
+ability it costs.
 
 This paper makes five contributions:
 
@@ -172,15 +168,13 @@ forgetting relative to full fine-tuning is still unsettled. Biderman et al.\
 \citep{Biderman2024LoRALearnsLess} argue that LoRA forgets less than full fine-tuning under matched
 performance; Shuttleworth et al.\ \citep{Shuttleworth2025Illusion} show LoRA-tuned weights develop
 structurally distinct ``intruder dimensions'' that offer a mechanistic account of why LoRA solutions can
-behave differently from full fine-tuning even at comparable in-domain accuracy; and Chen et
-al.\ \citep{Chen2024BayesianPEFT} state plainly that catastrophic forgetting ``remains an issue with PEFT''
-and propose a Bayesian regularizer to address it, while Kalajdzievski
+behave differently from full fine-tuning even at comparable in-domain accuracy; and Kalajdzievski
 \citep{Kalajdzievski2024Scaling} reports that forgetting under fine-tuning follows a fairly predictable
 scaling law and is not reliably avoided by early stopping alone. Our results (Section~4.4) add a concrete,
 statistically tested data point to this question in a domain --- handwriting recognition --- where it has
 not, to our knowledge, been examined before: LoRA at both r = 16 and r = 32 produces a significant, though
-partial, degradation on out-of-domain data, which sits closer to Chen et al.'s framing than to an unqualified
-reading of ``LoRA forgets less.''
+partial, degradation on out-of-domain data, which sits closer to Shuttleworth et al.'s and Kalajdzievski's
+framing than to an unqualified reading of ``LoRA forgets less.''
 
 \subsection{Prior work on prescription and medical handwriting OCR}
 
@@ -190,9 +184,7 @@ al.\ \citep{Mia2024KaggleRx}, who trained a VGG16 classifier on it. Ali et al.\
 on roughly 1{,}000 handwritten Pakistani prescriptions (augmented tenfold), reporting CER between 1.4\% and
 15.4\% depending on the test scenario --- the closest prior demonstration that fine-tuning a TrOCR-family
 model works at prescription scale, though on a different, private dataset and without a
-forgetting analysis. RxScribe Bench \citep{RxScribeBench2026}, published within weeks of the present work,
-benchmarks frontier VLMs on a newly collected private set of Indian outpatient prescriptions along four
-clinical-risk axes, but neither fine-tunes a model nor uses public data. A hybrid
+forgetting analysis. A hybrid
 Tesseract/PaddleOCR/GPT-4o pipeline for prescription reading has also been
 reported \citep{FrontiersMed2026Hybrid}, using a different model lineup and web-scraped rather than
 benchmark-standard data. Cheema et al.\ \citep{Cheema2024PeerJUrdu} published a related methodological
@@ -360,9 +352,18 @@ instruction-following failures (see text).
 \end{minipage}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig1_cer_comparison.png}
+\caption{CER by model and dataset (mean, 95\% bootstrap CI), all eight systems: the seven zero-shot systems
+of Table~\ref{tab:zeroshot} plus the fine-tuned model introduced in Section~4.2.}
+\label{fig:cer_comparison}
+\end{figure}
+
 The strongest zero-shot system on the target, prescription domain is Qwen2.5-VL-3B-Instruct, a
 general-purpose 3B-parameter VLM, ahead of every OCR-specialist model we tested, including the
-purpose-built GOT-OCR2.0 (roughly 580M parameters). Taken at face value this is a striking result: a model
+purpose-built GOT-OCR2.0 (roughly 580M parameters), as Figure~\ref{fig:cer_comparison} shows alongside the
+fine-tuned model introduced in Section~4.2. Taken at face value this is a striking result: a model
 with no OCR-specific training objective beats models built specifically to read text, plausibly because
 some world knowledge of what a plausible drug name looks like helps it resolve otherwise ambiguous
 handwriting. On IAM, GOT-OCR2.0 and TrOCR-large-handwritten --- the latter directly pretrained toward
@@ -375,7 +376,9 @@ image\ldots''} against a one-character ground truth. Against a very short refere
 produces an enormous per-image CER. We read this as two things at once: a substantive finding, that mean
 CER can badly mislead when summarizing instruction-tuned VLMs (a paired Wilcoxon test between Qwen2.5-VL-3B
 and GOT-OCR2.0 on IAM is \textit{not} significant, $p = 0.330$, despite the large gap in means), and a
-caution for anyone scoring general VLMs as OCR systems using mean error alone.
+caution for anyone scoring general VLMs as OCR systems using mean error alone. Figure~\ref{fig:cer_dist}
+shows this heavy-tailedness directly: several models, Qwen2.5-VL-3B most visibly, have a median CER far
+below their mean, with a long tail of high-CER outliers pulling the mean upward.
 
 Donut-base fails almost entirely under both presentations we tried: essentially 100\% degenerate (empty)
 output on raw word crops, and, when padded onto a page-sized canvas to better match its pretraining
@@ -384,6 +387,15 @@ hallucination on whatever it does produce (mean CER 4.20 and 1.06, respectively)
 that Donut's ``OCR-free,'' full-document pretraining simply does not transfer, absent further fine-tuning,
 to isolated single-word recognition --- a useful negative result given how loosely Donut's architecture is
 sometimes described as a general-purpose OCR-free document reader.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig6_cer_distribution.png}
+\caption{Per-image CER distributions (box = median/IQR) for the four transformer-based systems, both
+datasets. The gap between the box (median) and the mean reported in Table~\ref{tab:zeroshot} is largest for
+Qwen2.5-VL-3B on IAM, illustrating the mean/median discrepancy discussed in the text.}
+\label{fig:cer_dist}
+\end{figure}
 
 \subsection{LoRA fine-tuning and ablation}
 
@@ -404,7 +416,8 @@ r = 16, no elastic & 0.150 [0.134, 0.167] & 0.562 [0.505, 0.627] & $0.647$ / $0.
 \end{tabular}
 \end{table}
 
-The a priori ``middle'' choice, r = 16, turns out to be beaten on Kaggle-Rx by both r = 8 and r = 32 (both
+As Table~\ref{tab:ablation} shows, the a priori ``middle'' choice, r = 16, turns out to be beaten on
+Kaggle-Rx by both r = 8 and r = 32 (both
 $p < 10^{-6}$), and r = 32 additionally posts the best point estimate on IAM, though that specific
 r = 32-versus-r = 16 comparison on IAM falls just short of the conventional 0.05 threshold ($p = 0.079$).
 Since r = 32 is at least as good as every other configuration we tried on both axes, with no trade-off we
@@ -415,10 +428,17 @@ $p = 0.647$) but produces a worse point estimate on IAM (0.562 versus 0.524), ag
 non-significant hint that it helps retention.
 
 Training at r = 32 reaches its best validation CER (0.102 on the 300-image tracking subsample) at epoch~2 of
-15, and early stopping triggers at epoch~7 after five epochs without improvement (Figure~2). Validation loss
-keeps falling past epoch~2 even as validation CER plateaus and then worsens, which is consistent with the
-model starting to overfit the small training set on the loss objective well before that shows up in the CER
-metric.
+15, and early stopping triggers at epoch~7 after five epochs without improvement
+(Figure~\ref{fig:training_curve}). Validation loss keeps falling past epoch~2 even as validation CER
+plateaus and then worsens, which is consistent with the model starting to overfit the small training set on
+the loss objective well before that shows up in the CER metric.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/fig2_training_curve.png}
+\caption{LoRA fine-tuning (r = 32): validation CER and loss per epoch, best checkpoint (epoch 2) marked.}
+\label{fig:training_curve}
+\end{figure}
 
 \subsection{Fine-tuned model versus every zero-shot system}
 
@@ -440,7 +460,7 @@ TrOCR-large-handwritten (zero-shot) & 0.580 [0.555, 0.606] & 8.1\% & 79.5\% \\
 
 Fine-tuning TrOCR-large-handwritten with LoRA at r = 32, on 3{,}120 images, takes CER from 0.580 zero-shot to
 0.114 --- an 80.3\% relative reduction --- and raises exact match from 8.1\% to 68.1\% and closed-vocabulary
-top-1 accuracy from 79.5\% to 92.4\%. This 558M-parameter fine-tuned model beats every zero-shot system we
+top-1 accuracy from 79.5\% to 92.4\% (Table~\ref{tab:headline}). This 558M-parameter fine-tuned model beats every zero-shot system we
 tested on this domain, including systems with far more parameters or explicit OCR specialization: against
 Qwen2.5-VL-3B-Instruct (3B parameters), $p = 4.4\times10^{-59}$; against GOT-OCR2.0 (roughly 580M
 parameters, built specifically for OCR), $p = 8.0\times10^{-93}$ (paired Wilcoxon signed-rank, n = 780 in
@@ -453,16 +473,24 @@ larger general-purpose VLMs on a target handwriting domain.
 On IAM, the fine-tuned model's CER rises from 0.441 (zero-shot TrOCR) to 0.501 --- a 13.7\% relative
 \textit{increase} in error, and a statistically significant one ($p = 3.2\times10^{-4}$, paired Wilcoxon,
 n = 400). The median CER on IAM rises too, from 0.0 zero-shot to 0.400 fine-tuned, which tells us this is a
-broad, systematic shift rather than a handful of outlier failures. Figure~5 plots the resulting reversal in
-domain-shift gap (CER on IAM minus CER on Kaggle-Rx) across every model: zero-shot OCR-specialist models
-(TrOCR, GOT-OCR2.0) score slightly \textit{better} on IAM than on Kaggle-Rx, a negative gap consistent with
-IAM being closer to their original pretraining distribution than prescription handwriting is, while the
-fine-tuned model shows a substantial positive gap --- a direct, quantitative signature of the specialization
-it has undergone. One thing worth clarifying so Table~2 is not misread against this gap figure: the gap
-being similar in size for r = 16 (+0.376) and r = 32 (+0.387) does not contradict r = 32 being better on
-\textit{both} datasets in absolute terms. r = 32 improves Kaggle-Rx performance by more than it improves
-IAM performance relative to r = 16, and that is enough to widen the gap slightly even as both individual
-numbers get better.
+broad, systematic shift rather than a handful of outlier failures. Figure~\ref{fig:domain_gap} plots the
+resulting reversal in domain-shift gap (CER on IAM minus CER on Kaggle-Rx) across every model: zero-shot
+OCR-specialist models (TrOCR, GOT-OCR2.0) score slightly \textit{better} on IAM than on Kaggle-Rx, a
+negative gap consistent with IAM being closer to their original pretraining distribution than prescription
+handwriting is, while the fine-tuned model shows a substantial positive gap --- a direct, quantitative
+signature of the specialization it has undergone. One thing worth clarifying so Table~2 is not misread
+against this gap figure: the gap being similar in size for r = 16 (+0.376) and r = 32 (+0.387) does not
+contradict r = 32 being better on \textit{both} datasets in absolute terms. r = 32 improves Kaggle-Rx
+performance by more than it improves IAM performance relative to r = 16, and that is enough to widen the gap
+slightly even as both individual numbers get better.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/fig5_domain_gap.png}
+\caption{Domain-shift gap (CER on IAM minus CER on Kaggle-Rx) by model. Blue bars score better on IAM; red
+bars score better on Kaggle-Rx.}
+\label{fig:domain_gap}
+\end{figure}
 
 This result sits in some tension with, though does not directly contradict, the claim that LoRA-family
 fine-tuning is broadly protective against catastrophic forgetting \citep{Biderman2024LoRALearnsLess}: we did
@@ -470,8 +498,9 @@ not run a matched full fine-tuning comparison, so we cannot say LoRA forgets \te
 fine-tuning would here, only that updating under 2\% of parameters was not enough, in this setting, to avoid
 a statistically significant loss of out-of-domain handwriting ability. That is more consistent with the more
 qualified picture in Shuttleworth et al.'s account of LoRA-specific ``intruder
-dimensions'' \citep{Shuttleworth2025Illusion} and Chen et al.'s explicit statement that forgetting
-``remains an issue'' for PEFT generally \citep{Chen2024BayesianPEFT}.
+dimensions'' \citep{Shuttleworth2025Illusion} and Kalajdzievski's finding that forgetting under fine-tuning
+follows a fairly predictable scaling law rather than being reliably avoided by early stopping
+alone \citep{Kalajdzievski2024Scaling}.
 
 \subsection{Qualitative error taxonomy and clinical safety implications}
 
@@ -491,12 +520,20 @@ Hallucination, far off (resembles no real drug) & 18.6\% & 4.5\% \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/fig3_error_taxonomy_kaggle_rx.png}
+\caption{Kaggle-Rx error-category composition (Table~\ref{tab:errortax}), zero-shot vs.\ fine-tuned.}
+\label{fig:errortax_rx}
+\end{figure}
+
 Fine-tuning cuts the outright-nonsensical ``hallucination, far off'' category roughly fourfold (18.6\% to
 4.5\%): the model becomes much less prone to guessing wildly. But the smaller category of errors that
 resemble a \textit{different, real} drug name rises from 1.5\% to 2.6\%, a 1.7-fold relative increase. We
 think this is the most clinically relevant result in the paper. A prediction that reads as \textit{some
 other real medicine} --- for instance, ground truth ``Amodis'' misread as ``Amodin,'' which itself sits
-closer to the unrelated real drug ``Axodin'' than to the correct answer --- looks plausible on its face and,
+closer to the unrelated real drug ``Axodin'' than to the correct answer (Figure~\ref{fig:qualitative} shows
+this and three other examples) --- looks plausible on its face and,
 by the look-alike/sound-alike medication-error
 literature \citep{Bryan2021LASA,Ostini2012LASA,Karet2023TallMan}, is considerably harder to catch on routine
 manual review than output that plainly is not a real drug name. Aggregate CER improves a great deal under
@@ -509,11 +546,28 @@ wrong relative to the true IAM label; both are plausibly chance collisions on a 
 rather than systematic drug-name intrusion, and we do not think this rises to a meaningful effect at our
 sample size.
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig7_qualitative_examples.png}
+\caption{Representative Kaggle-Rx word crops with ground truth, zero-shot, and fine-tuned predictions, one
+example per error category from Table~\ref{tab:errortax} (left to right: correct $\times2$, confusable
+wrong drug $\times2$, hallucination, minor OCR noise).}
+\label{fig:qualitative}
+\end{figure}
+
 On IAM, the error-severity distribution moves from 57.3\% exact match / 12.8\% moderate error / 23.3\%
-severe error zero-shot to 26.8\% / 32.8\% / 27.5\% fine-tuned --- mostly a shift from exactly correct to
-moderately wrong, rather than toward outright failure, which adds some nuance to the mean/median framing of
-Section~4.4: fine-tuning on a narrow domain degrades a broad swath of previously perfect out-of-domain
-predictions to ``partially wrong'' more than it manufactures new catastrophic failures.
+severe error zero-shot to 26.8\% / 32.8\% / 27.5\% fine-tuned (Figure~\ref{fig:errortax_iam}) --- mostly a
+shift from exactly correct to moderately wrong, rather than toward outright failure, which adds some nuance
+to the mean/median framing of Section~4.4: fine-tuning on a narrow domain degrades a broad swath of
+previously perfect out-of-domain predictions to ``partially wrong'' more than it manufactures new
+catastrophic failures.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/fig4_error_taxonomy_iam.png}
+\caption{IAM error-severity composition, zero-shot vs.\ fine-tuned.}
+\label{fig:errortax_iam}
+\end{figure}
 
 \section{Discussion}
 
@@ -537,9 +591,8 @@ mistaken impression that it was close to optimal.
 significant, systematic degradation on out-of-domain handwriting after updating under 2\% of parameters ---
 sits uneasily next to the idea that PEFT methods are largely protective against
 forgetting \citep{Biderman2024LoRALearnsLess}, though it does not contradict that work directly, since we
-never ran a matched full fine-tuning comparison. It fits more comfortably with the more qualified accounts:
-Shuttleworth et al.'s ``intruder dimensions'' \citep{Shuttleworth2025Illusion} and Chen et al.'s plain
-statement that forgetting remains a live problem for PEFT \citep{Chen2024BayesianPEFT}. Practically, this
+never ran a matched full fine-tuning comparison. It fits more comfortably with the more qualified account in
+Shuttleworth et al.'s ``intruder dimensions'' \citep{Shuttleworth2025Illusion}. Practically, this
 suggests that anyone fine-tuning a general HTR model for a narrow domain should budget for an
 out-of-domain check, rather than assuming a small trainable-parameter fraction is protection enough on its
 own.
@@ -557,14 +610,6 @@ intervention. In practice, this argues for evaluating and, ideally, optimizing p
 against a confusable-drug-aware metric rather than aggregate CER alone, and for a lexicon- or
 LASA-list-aware post-processing correction stage as a natural next step, which we did not implement here
 (Section~7).
-
-\textbf{Position relative to the closest related work.} RxScribe Bench \citep{RxScribeBench2026}, published
-within weeks of this study, tackles a closely related question --- benchmarking frontier VLMs on
-handwritten prescriptions along clinical-risk axes --- but on a newly collected, private dataset of Indian
-outpatient prescriptions, without a fine-tuning or forgetting analysis. We see our work as complementary: a
-fully public and independently reproducible dataset and pipeline, a directly comparable model set that
-includes both a purpose-built OCR-2.0 system and general VLMs, and an explicit test of whether lightweight
-fine-tuning changes the qualitative safety profile of the errors that remain, not only their aggregate rate.
 
 \textbf{Reproducibility lessons for the OCR/VLM community.} Two of the seven systems we set out to
 benchmark needed real debugging before they produced valid output, and one, PaddleOCR-VL, could not be run
