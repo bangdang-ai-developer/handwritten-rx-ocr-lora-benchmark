@@ -9,7 +9,8 @@
 \usepackage{booktabs}
 \usepackage{amsmath,amssymb}
 \usepackage{authblk}
-\usepackage[colorlinks=true,citecolor=blue,linkcolor=blue,urlcolor=blue]{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage[colorlinks=true,citecolor=blue,linkcolor=blue,urlcolor=blue,breaklinks=true]{hyperref}
 \usepackage[round]{natbib}
 \usepackage{setspace}
 \usepackage{caption}
@@ -213,7 +214,7 @@ this paper (see Data Availability) so the results below can be reproduced exactl
 \subsection{Datasets}
 
 \textbf{Kaggle-Rx.} The ``Doctor's Handwritten Prescription BD dataset'' \citep{Mia2024KaggleRx}
-(\texttt{mamun1113/doctors-handwritten-prescription-bd-dataset} on Kaggle) contains cropped, single-word
+(\url{mamun1113/doctors-handwritten-prescription-bd-dataset} on Kaggle) contains cropped, single-word
 handwritten images of 78 drug names, pre-split by the dataset authors into \texttt{Training},
 \texttt{Validation}, and \texttt{Testing} folders with accompanying label files. We verified the actual
 split sizes by direct enumeration rather than trusting the dataset page's summary description, which states
@@ -227,7 +228,7 @@ runs (fixed seed = 42) before relying on it for paired statistical tests.
 \textbf{IAM.} We use the IAM Handwriting Word Database \citep{Marti2002IAM} as an out-of-domain control
 representing general, non-medical English handwriting, drawing a fixed random subsample of 400 word images
 (seed = 42, again verified identical across runs) through the Kaggle mirror
-\texttt{nibinv23/iam-handwriting-word-database}. IAM serves two purposes here: a domain-shift baseline
+\url{nibinv23/iam-handwriting-word-database}. IAM serves two purposes here: a domain-shift baseline
 against which to read Kaggle-Rx performance, and a generalization probe for the fine-tuned model, which
 never sees IAM during training.
 
@@ -675,8 +676,9 @@ become available.
 \paragraph{Data availability.} All code (benchmark pipeline, fine-tuning script, analysis scripts, figure
 generation), the frozen evaluation manifests, per-image predictions for every model, and the final LoRA
 adapter weights are available at \textbf{[repository URL --- to be added]}. Both datasets are public: Kaggle-Rx
-at \texttt{kaggle.com/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset}, and IAM through its
-standard registration process at \texttt{fki.tic.heia-fr.ch/databases/iam-handwriting-database}; readers
+at \url{https://www.kaggle.com/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset}, and IAM
+through its standard registration process at \url{https://fki.tic.heia-fr.ch/databases/iam-handwriting-database};
+readers
 should independently check the exact license terms on each dataset's page before redistributing it.
 
 \paragraph{Funding.} This work received no external funding; compute was provided by Kaggle's free-tier GPU
