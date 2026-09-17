@@ -37,7 +37,12 @@ Toàn bộ dữ liệu thô: [results/results_master_combined.csv](results/resul
 
 Top-1 accuracy (ánh xạ về 78 tên thuốc thật) sau fine-tune: **89,9%**. Chi tiết đầy đủ (cấu hình LoRA, lịch sử train, diễn giải song song 2 phát hiện) ở [results/phase7_summary.md](results/phase7_summary.md).
 
-**Tiếp theo:** Phase 9-13 (phân tích thống kê tổng hợp toàn bộ model + phân tích lỗi định tính + viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md). Toàn bộ pipeline chạy qua điều khiển trực tiếp Kaggle API (`kaggle kernels push/status/output`, không cần mở trình duyệt) — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py).
+**Phân tích tổng hợp (Phase 9) ĐÃ XONG** — phát hiện quan trọng nhất: sau fine-tune, TrOCR-large-handwritten
+(558M) **vượt qua mọi model zero-shot, kể cả VLM lớn hơn nhiều (Qwen2.5-VL-3B, GOT-OCR2.0)** trên domain mục
+tiêu (CER 0,149 vs 0,434 vs 0,479, Wilcoxon p<10⁻⁴⁷ cho cả hai so sánh). Chi tiết đầy đủ (bảng 8 model × 2
+dataset, domain-shift gap, lưu ý về phân phối đuôi dài/outlier-robustness) ở [results/phase9_summary.md](results/phase9_summary.md), script tái lập ở [src/analyze_aggregate.py](src/analyze_aggregate.py).
+
+**Tiếp theo:** Phase 10-13 (phân tích lỗi định tính + viết bài + nộp). Chi tiết đầy đủ ở [docs/05-ke-hoach-Q2.md](docs/05-ke-hoach-Q2.md). Toàn bộ pipeline chạy qua điều khiển trực tiếp Kaggle API (`kaggle kernels push/status/output`, không cần mở trình duyệt) — xem [notebooks/kaggle_benchmark.py](notebooks/kaggle_benchmark.py).
 
 ## Điểm mấu chốt (tóm tắt nhanh)
 
