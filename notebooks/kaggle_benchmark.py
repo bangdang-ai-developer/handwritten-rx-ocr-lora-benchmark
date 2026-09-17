@@ -836,7 +836,13 @@ def phase6_finetune_trocr():
 
     def compute_metrics(pred):
         label_ids = pred.label_ids.copy()
-        pred_ids = pred.predictions
+        pred_ids = pred.predictions.copy()
+        # Khi cac eval batch sinh chuoi co do dai khac nhau, Trainer noi (concat) predictions
+        # giua cac batch bang cach dem -100 vao cho thieu (torch_pad_and_concatenate) - gia tri
+        # am nay lam tokenizer.decode overflow (OverflowError: out of range integral type
+        # conversion attempted, gap o kernel v19 epoch 10). Phai loc -100 truoc khi decode,
+        # giong nhu da lam voi label_ids ben duoi.
+        pred_ids[pred_ids == -100] = processor.tokenizer.pad_token_id
         pred_str = processor.batch_decode(pred_ids, skip_special_tokens=True)
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
         label_str = processor.batch_decode(label_ids, skip_special_tokens=True)
