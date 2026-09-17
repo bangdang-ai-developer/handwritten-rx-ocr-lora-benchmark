@@ -56,7 +56,7 @@ CURRENT_PHASE = 6   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
 # Chon cau hinh ablation se chay khi CURRENT_PHASE == 6 (moi kernel push chay 1 cau hinh,
 # doi ABLATION_CONFIG roi push kernel moi cho cau hinh tiep theo - xem results/phase7b_ablation_summary.md).
 # "main" (r=16, elastic=True) DA CHAY XONG (kernel v20) - khong can chay lai.
-ABLATION_CONFIG = "r32"   # "main" | "r8" | "r32" | "r16_noelastic"
+ABLATION_CONFIG = "r16_noelastic"   # "main" | "r8" | "r32" | "r16_noelastic"
 _ABLATION_PRESETS = {
     "main":          dict(lora_r=16, lora_alpha=32, use_elastic=True,  run_name="trocr-lora-finetuned"),
     "r8":            dict(lora_r=8,  lora_alpha=16, use_elastic=True,  run_name="trocr-lora-r8"),
