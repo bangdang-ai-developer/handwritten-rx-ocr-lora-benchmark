@@ -1,6 +1,6 @@
-\documentclass[11pt]{article}
+\documentclass[12pt]{article}
 
-\usepackage[margin=1in]{geometry}
+\usepackage[letterpaper,margin=2.5cm]{geometry}
 \usepackage{times}
 \usepackage[T1]{fontenc}
 \usepackage[english]{babel}
@@ -15,6 +15,8 @@
 \usepackage{setspace}
 \usepackage{caption}
 \usepackage{enumitem}
+\usepackage[right]{lineno}
+\usepackage{ragged2e}
 
 \setcitestyle{numbers,square}
 \setlength{\bibsep}{4pt}
@@ -31,11 +33,14 @@
 
 \begin{document}
 
+\linenumbers
+\RaggedRight
+
 \maketitle
 
 \begin{center}
 \textit{Corresponding author: Bang Dang (\href{mailto:bangdang007112@gmail.com}{bangdang007112@gmail.com})}\\[2pt]
-\textit{Target venue: PeerJ Computer Science (primary); Journal of Imaging and Health Information Science and Systems (alternates)}
+\textit{Target venue: PeerJ Computer Science (AI Application track)}
 \end{center}
 
 % Note to author, remove before submission: confirm the name/affiliation string above and add an ORCID
@@ -231,6 +236,7 @@ never sees IAM during training.
 
 \subsection{Models evaluated zero-shot}
 
+{\small
 We group seven systems into three families. \textit{Classical}: Tesseract \citep{Smith2007Tesseract}
 (LSTM-based engine) and EasyOCR (CRAFT detector with a CRNN recognizer, used here in single-word mode).
 \textit{Specialist encoder-decoder / document-understanding transformers}:
@@ -246,6 +252,7 @@ own \texttt{trust\_remote\_code} modeling file (\texttt{create\_causal\_mask() g
 argument `inputs\_embeds'}) under every \texttt{transformers} version we tried, matching an open, unresolved
 community bug report of the same problem. We treat this as a reproducibility finding worth reporting in its
 own right (Section~5.6) rather than a gap to quietly leave out.
+\par}
 
 Every zero-shot model was first run on five images and checked for non-degenerate output before we
 committed to the full 1{,}180-image (780 + 400) evaluation, and \texttt{transformers==4.57.0} was pinned
@@ -306,7 +313,11 @@ with a cosine schedule (peak learning rate $2\times10^{-4}$, 8--10\% warmup), an
 (8 physical $\times$ 2 gradient-accumulation steps) under \texttt{fp16} mixed precision (\texttt{bf16} is
 not well supported on the Turing-architecture T4 GPUs used here), up to 15 epochs with early stopping
 (patience of 5 epochs on validation CER), and a five-hour wall-clock cutoff per run. Training runs on a
-single Kaggle notebook session with two T4 GPUs under automatic \texttt{DataParallel}.
+single Kaggle Notebooks session (Kaggle's standard GPU-enabled, Ubuntu-based Python Docker image) with two
+NVIDIA T4 GPUs (16GB each) under automatic \texttt{DataParallel}, using \texttt{transformers==4.57.0}
+(pinned; see Section~3.2), \texttt{peft} for the LoRA implementation, and \texttt{torchao>=0.16.0} (the
+Kaggle base image's default \texttt{torchao==0.10.0} is incompatible with \texttt{peft}'s
+\texttt{get\_peft\_model} and must be upgraded explicitly).
 
 \textbf{Rank and augmentation ablation.} Rather than fixing the LoRA rank in advance, we trained to early
 stopping for three ranks (r $\in \{8, 16, 32\}$, $\alpha = 2r$ throughout, elastic distortion on) and, with
