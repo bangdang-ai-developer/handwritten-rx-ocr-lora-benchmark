@@ -44,7 +44,7 @@
 \end{center}
 
 \begin{abstract}
-Handwritten prescriptions are a recognized source of medication error, which makes automatic transcription
+Handwritten prescriptions are a recognized source of medication error, making automatic transcription
 a natural application for optical character recognition (OCR). Recent general-purpose vision-language
 models (VLMs) are often described as strong OCR systems, but none has been systematically benchmarked on
 public handwritten-prescription data or compared against a fine-tuned OCR specialist under matched
@@ -65,8 +65,8 @@ Looking at error categories rather than aggregate CER, fine-tuning cuts outright
 by roughly four-fold, but the errors that remain shift toward predictions that read as a \textit{different,
 real} drug name --- a smaller category, but arguably the more dangerous one, since it is far less likely to
 be caught on manual review than an obviously wrong transcription. We saw no meaningful sign of a related
-risk, namely the model inserting memorized drug names into ordinary text it had never been trained on. Code,
-frozen evaluation data, and the trained adapter are released to support exact reproduction on free-tier
+risk, namely the model inserting memorized drug names into ordinary text it had never been trained on. The
+code, frozen evaluation data, and the trained adapter are released to support exact reproduction on free-tier
 cloud GPUs.
 
 \vspace{4pt}
@@ -80,12 +80,12 @@ Illegible or misread handwriting on prescriptions is a well-documented contribut
 \citep{Bryan2021LASA,Ostini2012LASA}, which makes automatic reading of handwritten prescriptions more than
 a convenience: done well, it could flag ambiguous entries before they ever reach a pharmacy counter.
 Handwritten text recognition (HTR), the underlying technical problem, has gone through several distinct
-generations of approach. Early systems relied on binarization and template matching. These gave way to
+generations of approaches. Early systems relied on binarization and template matching. These gave way to
 CNN--RNN sequence models trained with connectionist temporal classification loss, of which Tesseract's
 LSTM-based engine \citep{Smith2007Tesseract} is a widely deployed example. TrOCR \citep{Li2023TrOCR} recast
 recognition as sequence-to-sequence translation, pairing a vision transformer encoder with an autoregressive
 text decoder. Donut \citep{Kim2022Donut} went further and dropped explicit character-level modeling
-altogether, training an image-to-text transformer end to end on synthetic full-page documents. Most
+altogether, training an end-to-end image-to-text transformer on synthetic full-page documents. Most
 recently, general-purpose vision-language models --- GOT-OCR2.0 \citep{Wei2024GOTOCR},
 Qwen2.5-VL \citep{Bai2025Qwen}, PaddleOCR-VL \citep{Cui2025PaddleOCRVL} --- have started to treat OCR as one
 capability among many rather than a dedicated training objective.
@@ -110,7 +110,7 @@ of its parameters on one free-tier GPU, statistically outperforms every zero-sho
 target domain, including a 3B-parameter general VLM and a purpose-built ``OCR-2.0'' model of roughly
 comparable size.
 \item A full rank (r = 8/16/32) and augmentation ablation showing that a commonly used default rank, 16,
-was in fact beaten on both axes we measured --- in-domain accuracy and out-of-domain retention --- by a
+was, in fact, beaten on both axes we measured --- in-domain accuracy and out-of-domain retention --- by a
 higher rank, 32. We take this as a caution against treating a LoRA rank choice as safe simply because it is
 common practice.
 \item A statistically grounded look at catastrophic forgetting under LoRA: fine-tuning measurably
@@ -765,7 +765,7 @@ used for portions of manuscript review and venue-verification research on 18 Sep
 % record and are omitted here rather than guessed at -- please confirm and add if you recall which model(s)
 % you used in that earlier period, or leave as-is if unconcerned.
 The author (B.\,Dang) has reviewed Anthropic's terms of service and usage policies for Claude and confirms
-these tools are suitable for use in preparing this manuscript for publication. The author directed all
+that these tools are suitable for use in preparing this manuscript for publication. The author directed all
 research decisions, designed and ran every experiment, independently verified every statistic, figure, and
 citation reported in this manuscript (including the accuracy of all references), and takes full
 responsibility for the integrity of the whole content. No generative AI tool is listed as an author, and no
