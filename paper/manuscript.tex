@@ -585,7 +585,7 @@ Fine-tuning cuts the outright-nonsensical ``hallucination, far off'' category ro
 resemble a \textit{different, real} drug name rises from 1.5\% to 2.6\%, a 1.7-fold relative increase. We
 think this is the most clinically relevant result in the paper. A prediction that reads as \textit{some
 other real medicine} --- for instance, ground truth ``Amodis'' misread as ``Amodin,'' which itself sits
-closer to the unrelated real drug ``Axodin'' than to the correct answer (Figure~\ref{fig:qualitative} shows
+closer to the unrelated real drug ``Axodin'' than to the correct answer (Table~\ref{tab:qualitative} shows
 this and three other examples) --- looks plausible on its face and,
 by the look-alike/sound-alike medication-error
 literature \citep{Bryan2021LASA,Ostini2012LASA,Karet2023TallMan}, is considerably harder to catch on routine
@@ -599,14 +599,28 @@ wrong relative to the true IAM label; both are plausibly chance collisions on a 
 rather than systematic drug-name intrusion, and we do not think this rises to a meaningful effect at our
 sample size.
 
-\begin{figure}[ht]
+\begin{table}[ht]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/fig7_qualitative_examples.png}
-\caption{Representative Kaggle-Rx word crops with ground truth, zero-shot, and fine-tuned predictions, one
-example per error category from Table~\ref{tab:errortax} (left to right: correct $\times2$, confusable
-wrong drug $\times2$, hallucination, minor OCR noise).}
-\label{fig:qualitative}
-\end{figure}
+\caption{Representative fine-tuned-model (r = 32) predictions on Kaggle-Rx, one example per error category
+from Table~\ref{tab:errortax}. Reported as reference/prediction text rather than image crops: the underlying
+handwriting images are third-party content from the Kaggle-Rx dataset \citep{Mia2024KaggleRx}, released
+under the Open Database License with contents copyright reserved to the original authors, and we have not
+separately obtained reproduction permission for specific images; the drug names and model outputs
+themselves are factual strings, not copyrightable expression.}
+\label{tab:qualitative}
+\begin{tabular}{llll}
+\toprule
+Category & Reference & Fine-tuned prediction & Nearest vocabulary match \\
+\midrule
+Correct & Baclofen & Baclofen & Baclofen \\
+Correct & Denixil & Denixil & Denixil \\
+Confusable wrong drug & Amodis & Amodin & Axodin \\
+Confusable wrong drug & Etizin & Eitrin & Zithrin \\
+Hallucination, far off & Alatrol & KKKKK & Beklo \\
+Minor OCR noise, still correct drug & Aceta & Acata & Aceta \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 On IAM, the error-severity distribution moves from 57.3\% exact match / 12.8\% moderate error / 23.3\%
 severe error zero-shot to 26.8\% / 32.8\% / 27.5\% fine-tuned (Figure~\ref{fig:errortax_iam}) --- mostly a

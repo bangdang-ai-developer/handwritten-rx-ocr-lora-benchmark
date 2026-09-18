@@ -8,6 +8,11 @@ results/*.csv
 !results/phase11_statistics_full.csv
 results/*.png
 !results/figures/*.png
+# Reproduces actual handwriting-image crops from the ODbL-licensed Kaggle-Rx dataset
+# (contents copyright reserved to the original authors) -- not cleared for redistribution.
+# See manuscript.tex Table~\ref{tab:qualitative} for the text-only replacement used in the paper.
+paper/figures/fig7_qualitative_examples.png
+results/figures/fig7_qualitative_examples.png
 results/augmentation_preview/
 .ipynb_checkpoints/
 *.egg-info/
