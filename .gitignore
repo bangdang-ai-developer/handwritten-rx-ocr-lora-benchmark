@@ -5,6 +5,7 @@ data/*
 !data/.gitkeep
 results/*.csv
 !results/frozen_test_manifest_*.csv
+!results/phase11_statistics_full.csv
 results/*.png
 !results/figures/*.png
 results/augmentation_preview/
