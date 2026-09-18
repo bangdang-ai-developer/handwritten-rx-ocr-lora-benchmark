@@ -38,11 +38,8 @@
 \textit{Target venue: PeerJ Computer Science (primary); Journal of Imaging and Health Information Science and Systems (alternates)}
 \end{center}
 
-\vspace{6pt}
-\begin{quote}
-\small\textit{Note to author, remove before submission: confirm the name/affiliation string above and add
-an ORCID if available.}
-\end{quote}
+% Note to author, remove before submission: confirm the name/affiliation string above and add an ORCID
+% if available. (Moved out of the rendered PDF -- it was previously visible body text inside a \quote block.)
 
 \begin{abstract}
 Handwritten prescriptions are a recognized source of medication error, which makes automatic transcription
@@ -282,6 +279,21 @@ the same seeded procedure and was checked to return an identical image set acros
 model's CER distribution turns out to be heavily right-skewed (Section~4.1), we report the median alongside
 the mean.
 
+For every paired comparison we additionally report the matched-pairs rank-biserial correlation as an effect
+size, $r = (W_{+} - W_{-}) / (W_{+} + W_{-})$, computed directly from the signed ranks of the non-zero
+differences rather than back-derived from the test statistic; it is bounded in $[-1, 1]$, with its sign
+following (model A $-$ model B) \citep{Cureton1956RankBiserial}. Wilcoxon signed-rank on per-image CER is the
+field-standard choice for paired system comparisons of this kind \citep{Dror2018Wilcoxon}. Because we run
+multiple paired comparisons, we apply Holm--Bonferroni correction \citep{Holm1979} \textit{within} two
+pre-specified families -- cross-model benchmark comparisons (Sections~4.1, 4.3, 4.4; seven comparisons) and
+within-method rank/augmentation ablation comparisons (Section~4.2; six comparisons) -- rather than across
+all thirteen comparisons jointly, since the two families answer different questions and pooling them would
+over-correct the family a reader actually cares about; both families and the exact test order were fixed
+before inspecting any $p$-value. We follow Dem\v{s}ar's \citep{Demsar2006} recommendation of Holm's
+step-down procedure over plain Bonferroni, since it is uniformly more powerful and requires no additional
+independence assumption. The script implementing this (\texttt{src/analyze\_statistics.py}) is released
+alongside the paper (Data Availability).
+
 \subsection{LoRA fine-tuning of TrOCR-large-handwritten}
 
 We fine-tune \texttt{microsoft/trocr-large-handwritten} with LoRA (via the \texttt{peft} library), targeting
@@ -363,7 +375,9 @@ of Table~\ref{tab:zeroshot} plus the fine-tuned model introduced in Section~4.2.
 
 The strongest zero-shot system on the target, prescription domain is Qwen2.5-VL-3B-Instruct, a
 general-purpose 3B-parameter VLM, ahead of every OCR-specialist model we tested, including the
-purpose-built GOT-OCR2.0 (roughly 580M parameters), as Figure~\ref{fig:cer_comparison} shows alongside the
+purpose-built GOT-OCR2.0 (roughly 580M parameters; paired Wilcoxon signed-rank, n = 780, Holm-adjusted
+$p = 3.8\times10^{-24}$ within the seven-comparison benchmark family; rank-biserial $r_{rb} = -0.49$, a
+moderate-to-large effect), as Figure~\ref{fig:cer_comparison} shows alongside the
 fine-tuned model introduced in Section~4.2. Taken at face value this is a striking result: a model
 with no OCR-specific training objective beats models built specifically to read text, plausibly because
 some world knowledge of what a plausible drug name looks like helps it resolve otherwise ambiguous
@@ -376,7 +390,10 @@ instance, predicting \textit{``The text is not visible in the image provided. Pl
 image\ldots''} against a one-character ground truth. Against a very short reference, a refusal like that
 produces an enormous per-image CER. We read this as two things at once: a substantive finding, that mean
 CER can badly mislead when summarizing instruction-tuned VLMs (a paired Wilcoxon test between Qwen2.5-VL-3B
-and GOT-OCR2.0 on IAM is \textit{not} significant, $p = 0.330$, despite the large gap in means), and a
+and GOT-OCR2.0 on IAM is \textit{not} significant, $p = 0.330$ --- unchanged after Holm--Bonferroni
+correction, since it is already the largest of the seven benchmark-family comparisons; rank-biserial
+$r_{rb} = 0.08$, a negligible effect, consistent with the median-driven story below --- despite the large
+gap in means), and a
 caution for anyone scoring general VLMs as OCR systems using mean error alone. Figure~\ref{fig:cer_dist}
 shows this heavy-tailedness directly: several models, Qwen2.5-VL-3B most visibly, have a median CER far
 below their mean, with a long tail of high-CER outliers pulling the mean upward.
@@ -403,30 +420,42 @@ Qwen2.5-VL-3B on IAM, illustrating the mean/median discrepancy discussed in the 
 \begin{table}[ht]
 \centering
 \caption{Rank and augmentation ablation on the frozen Kaggle-Rx (n = 780) and IAM (n = 400) test sets. Each
-configuration was trained once, to early stopping, on identical data and seed.}
+configuration was trained once, to early stopping, on identical data and seed. $p$-values are
+Holm--Bonferroni-adjusted within the six-comparison ablation family (Section~3.3); rank-biserial effect
+sizes for each comparison are reported in the text.}
 \label{tab:ablation}
+\small
 \begin{tabular}{lccc}
 \toprule
-Configuration & CER, Kaggle-Rx & CER, IAM & $p$ vs.\ r=16 elastic (Rx / IAM) \\
+Configuration & CER, Kaggle-Rx & CER, IAM & Holm $p$ vs.\ r=16 elastic (Rx / IAM) \\
 \midrule
-r = 8, elastic & 0.113 [0.098, 0.128] & 0.530 [0.475, 0.580] & $1.0\times10^{-7}$ / $0.830$ \\
+r = 8, elastic & 0.113 [0.098, 0.128] & 0.530 [0.475, 0.580] & $5.0\times10^{-7}$ / $1.00$ \\
 r = 16, elastic & 0.149 [0.132, 0.166] & 0.524 [0.472, 0.579] & --- \\
-\textbf{r = 32, elastic (selected)} & \textbf{0.114} [0.100, 0.130] & \textbf{0.501} [0.453, 0.552] & $2.4\times10^{-8}$ / $0.079$ \\
-r = 16, no elastic & 0.150 [0.134, 0.167] & 0.562 [0.505, 0.627] & $0.647$ / $0.101$ \\
+\textbf{r = 32, elastic (selected)} & \textbf{0.114} [0.100, 0.130] & \textbf{0.501} [0.453, 0.552] & $1.4\times10^{-7}$ / $0.32$ \\
+r = 16, no elastic & 0.150 [0.134, 0.167] & 0.562 [0.505, 0.627] & $1.00$ / $0.32$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 As Table~\ref{tab:ablation} shows, the a priori ``middle'' choice, r = 16, turns out to be beaten on
-Kaggle-Rx by both r = 8 and r = 32 (both
-$p < 10^{-6}$), and r = 32 additionally posts the best point estimate on IAM, though that specific
-r = 32-versus-r = 16 comparison on IAM falls just short of the conventional 0.05 threshold ($p = 0.079$).
-Since r = 32 is at least as good as every other configuration we tried on both axes, with no trade-off we
-could find, we use it as ``the fine-tuned model'' for the rest of this paper. Turning elastic distortion
-off, with rank held at 16, leaves in-domain CER essentially where it was (0.149 versus 0.150,
-$p = 0.647$) but produces a worse point estimate on IAM (0.562 versus 0.524), again short of significance
-($p = 0.101$); we kept elastic distortion in the final pipeline since there is no sign it hurts and a
-non-significant hint that it helps retention.
+Kaggle-Rx by both r = 8 and r = 32, and both differences survive Holm--Bonferroni correction within the
+six-comparison ablation family: r = 8 (Holm-adjusted $p = 5.0\times10^{-7}$, rank-biserial $r_{rb} = -0.41$)
+and r = 32 (Holm-adjusted $p = 1.4\times10^{-7}$, $r_{rb} = -0.47$), both moderate-to-large effects, with the
+negative sign reflecting that the non-default rank has the lower, better CER. Neither rank's IAM comparison
+with r = 16 survives correction (r = 8: Holm-adjusted $p = 1.00$, $r_{rb} = 0.02$; r = 32: see below), both
+negligible effects. r = 32 additionally posts the
+best point estimate on IAM, but we want to be explicit that this particular comparison does not survive
+correction: the raw $p$-value (0.079) looked close to the conventional 0.05 threshold, but after
+Holm--Bonferroni correction within the same six-comparison family it rises to $p = 0.32$, with a small
+effect size ($r_{rb} = -0.17$). We therefore treat r = 32's apparent IAM advantage over r = 16 as a favorable
+point estimate rather than a statistically established difference, and rely on the two Holm-significant,
+in-domain comparisons above --- together with the fact that r = 32 does not underperform r = 16 on IAM in
+absolute terms --- to justify using r = 32 as ``the fine-tuned model'' for the rest of this paper. Turning
+elastic distortion off, with rank held at 16, leaves in-domain CER essentially unchanged (0.149 versus 0.150;
+Holm-adjusted $p = 1.00$, $r_{rb} = 0.04$, a negligible effect) and produces a somewhat worse point estimate
+on IAM (0.562 versus 0.524) that likewise does not survive correction (Holm-adjusted $p = 0.32$,
+$r_{rb} = 0.15$, a small effect); we kept elastic distortion in the final pipeline because there is no sign
+it hurts, and only a small, statistically unconfirmed hint that it helps retention.
 
 Training at r = 32 reaches its best validation CER (0.102 on the 300-image tracking subsample) at epoch~2 of
 15, and early stopping triggers at epoch~7 after five epochs without improvement
@@ -461,25 +490,37 @@ TrOCR-large-handwritten (zero-shot) & 0.580 [0.555, 0.606] & 8.1\% & 79.5\% \\
 
 Fine-tuning TrOCR-large-handwritten with LoRA at r = 32, on 3{,}120 images, takes CER from 0.580 zero-shot to
 0.114 --- an 80.3\% relative reduction --- and raises exact match from 8.1\% to 68.1\% and closed-vocabulary
-top-1 accuracy from 79.5\% to 92.4\% (Table~\ref{tab:headline}). This 558M-parameter fine-tuned model beats every zero-shot system we
-tested on this domain, including systems with far more parameters or explicit OCR specialization: against
-Qwen2.5-VL-3B-Instruct (3B parameters), $p = 4.4\times10^{-59}$; against GOT-OCR2.0 (roughly 580M
-parameters, built specifically for OCR), $p = 8.0\times10^{-93}$ (paired Wilcoxon signed-rank, n = 780 in
-both cases). As far as we know, this is the first demonstration that a small, resource-efficient specialist
-model, adapted with under 2\% of its parameters on a single free-tier GPU, can decisively outperform much
-larger general-purpose VLMs on a target handwriting domain.
+top-1 accuracy from 79.5\% to 92.4\% (Table~\ref{tab:headline}). This improvement is itself the largest
+paired effect in the paper (Wilcoxon signed-rank, n = 780, Holm-adjusted $p = 4.9\times10^{-110}$ within the
+seven-comparison benchmark family; rank-biserial $r_{rb} = 0.97$). The fine-tuned, 558M-parameter model also
+beats every zero-shot system we tested on this domain, including systems with far more parameters or
+explicit OCR specialization: against Qwen2.5-VL-3B-Instruct (3B parameters), Holm-adjusted
+$p = 2.2\times10^{-58}$, $r_{rb} = -0.82$; against GOT-OCR2.0 (roughly 580M parameters, built specifically
+for OCR), Holm-adjusted $p = 4.8\times10^{-92}$, $r_{rb} = -0.95$ (paired Wilcoxon signed-rank, n = 780 in
+both cases; negative $r_{rb}$ in both comparisons simply because the fine-tuned model attains the lower CER
+of the pair). All three effect sizes are large by conventional benchmarks for rank-biserial correlation. As far as
+we know, this is the first demonstration that a small, resource-efficient specialist model, adapted with
+under 2\% of its parameters on a single free-tier GPU, can decisively outperform much larger general-purpose
+VLMs on a target handwriting domain.
 
 \subsection{Domain shift and generalization}
 
 On IAM, the fine-tuned model's CER rises from 0.441 (zero-shot TrOCR) to 0.501 --- a 13.7\% relative
-\textit{increase} in error, and a statistically significant one ($p = 3.2\times10^{-4}$, paired Wilcoxon,
-n = 400). The median CER on IAM rises too, from 0.0 zero-shot to 0.400 fine-tuned, which tells us this is a
-broad, systematic shift rather than a handful of outlier failures. Figure~\ref{fig:domain_gap} plots the
+\textit{increase} in error, and a statistically significant one (paired Wilcoxon, n = 400, Holm-adjusted
+$p = 6.4\times10^{-4}$ within the seven-comparison benchmark family; rank-biserial $r_{rb} = -0.26$, a
+small-to-moderate effect --- noticeably smaller than the $r_{rb} = 0.97$ in-domain improvement above, so we
+read this as a real but modest cost, not a comparably large effect in the opposite direction). The median
+CER on IAM rises too, from 0.0 zero-shot to 0.400 fine-tuned, which tells us this is a broad, systematic
+shift rather than a handful of outlier failures. Figure~\ref{fig:domain_gap} plots the
 resulting reversal in domain-shift gap (CER on IAM minus CER on Kaggle-Rx) across every model: zero-shot
 OCR-specialist models (TrOCR, GOT-OCR2.0) score slightly \textit{better} on IAM than on Kaggle-Rx, a
 negative gap consistent with IAM being closer to their original pretraining distribution than prescription
 handwriting is, while the fine-tuned model shows a substantial positive gap --- a direct, quantitative
-signature of the specialization it has undergone. One thing worth clarifying so Table~2 is not misread
+signature of the specialization it has undergone. The fine-tuned model is also now significantly behind the
+strongest zero-shot performer on IAM, GOT-OCR2.0 (0.501 versus 0.386; paired Wilcoxon signed-rank, n = 400,
+Holm-adjusted $p = 7.0\times10^{-13}$ within the seven-comparison benchmark family; rank-biserial
+$r_{rb} = 0.53$, a moderate-to-large effect), which it was not before fine-tuning specialized it toward
+prescription handwriting. One thing worth clarifying so Table~2 is not misread
 against this gap figure: the gap being similar in size for r = 16 (+0.376) and r = 32 (+0.387) does not
 contradict r = 32 being better on \textit{both} datasets in absolute terms. r = 32 improves Kaggle-Rx
 performance by more than it improves IAM performance relative to r = 16, and that is enough to widen the gap
@@ -634,7 +675,11 @@ vocabularies.
 (Sections~3.4, 4.2) was trained exactly once. The paired Wilcoxon tests tell us the specific trained
 checkpoints differ significantly on the frozen test sets; they do not tell us that repeated training runs at
 a given rank would reliably reproduce the same ranking, and part of the observed rank effect could be
-run-to-run training variance.
+run-to-run training variance. A replication with at least five independent training seeds per rank,
+reporting mean $\pm$ SD CER/WER and re-running the same Wilcoxon signed-rank plus Holm--Bonferroni plus
+rank-biserial pipeline (Section~3.3) across seeds, would be needed to establish whether the r = 8/32-over-16
+ordering reflects a true rank effect rather than seed noise; we did not have the compute budget for this
+within the free-tier GPU constraints of the study.
 \item \textbf{PaddleOCR-VL could not be benchmarked}, owing to an unresolved upstream library
 incompatibility, leaving one of the four general-VLM systems we set out to test excluded from quantitative
 comparison.
@@ -680,6 +725,24 @@ at \url{https://www.kaggle.com/datasets/mamun1113/doctors-handwritten-prescripti
 through its standard registration process at \url{https://fki.tic.heia-fr.ch/databases/iam-handwriting-database};
 readers
 should independently check the exact license terms on each dataset's page before redistributing it.
+
+\paragraph{AI-use disclosure.} The author used Claude (Anthropic), accessed via Claude Code,
+throughout this project's development (15--18 September 2026) to assist with drafting and editing manuscript
+prose, writing and reviewing the statistical-analysis code described in Section~3.3
+(\texttt{src/analyze\_\allowbreak statistics.py}), generating the figures in Section~4, and literature
+search and citation triage. Specifically: Claude Sonnet 5 (model ID claude-sonnet-5) produced the majority of
+the code commits, the LaTeX manuscript draft, the statistical-reporting script, and the final editing pass
+reported here (17--18 September 2026); Claude Haiku 4.5 (model ID claude-haiku-4-5-20251001) was
+used for portions of manuscript review and venue-verification research on 18 September 2026. % TODO(author):
+% the earlier development sessions (15--16 September 2026) that produced the benchmark and fine-tuning
+% pipeline predate this project's practice of recording model identity in commit metadata, so the exact
+% Claude model version(s) used in those specific sessions could not be reconstructed from the available
+% record and are omitted here rather than guessed at -- please confirm and add if you recall which model(s)
+% you used in that earlier period, or leave as-is if unconcerned.
+The author (B.\,Dang) directed all research decisions, designed and ran every experiment,
+independently verified every statistic, figure, and citation reported in this manuscript, and takes full
+responsibility for its content. No generative AI tool is listed as an author, and no AI tool was used to
+create, alter, or fabricate any research image or experimental data.
 
 \paragraph{Funding.} This work received no external funding; compute was provided by Kaggle's free-tier GPU
 quota.
