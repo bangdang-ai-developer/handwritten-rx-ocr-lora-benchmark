@@ -58,14 +58,34 @@ CURRENT_PHASE = 6   # 0=diagnostics, 1=classical OCR, 2=TrOCR+Donut, 3=GOT-OCR2.
 # Choose which ablation configuration to run when CURRENT_PHASE == 6 (each kernel push runs
 # one configuration - change ABLATION_CONFIG and push a new kernel for the next configuration,
 # see results/phase7b_ablation_summary.md).
-# "main" (r=16, elastic=True) HAS ALREADY BEEN RUN (kernel v20) - no need to rerun.
-ABLATION_CONFIG = "r16_noelastic"   # "main" | "r8" | "r32" | "r16_noelastic"
+# "main" (r=16, elastic=True) and "r16_noelastic" HAVE ALREADY BEEN RUN - no need to rerun.
+# "r8" needs a RERUN (2026-09-21): its adapter checkpoint was not preserved on disk (only its
+# metrics survived), and re-evaluating it on the Validation split - not the frozen Test split -
+# is needed to fix a test-set-leakage issue in how the reported rank (r=32) was originally chosen
+# (see docs/05-q2-research-plan.md and the advisor feedback that prompted this). This rerun at
+# seed=42 doubles as one of the 9 seed x rank data points for the multi-seed replication below.
+ABLATION_CONFIG = "r8"   # "main" | "r8" | "r32" | "r16_noelastic" | "r8_seed123" | ... (see _SEED_SWEEP below)
 _ABLATION_PRESETS = {
     "main":          dict(lora_r=16, lora_alpha=32, use_elastic=True,  run_name="trocr-lora-finetuned"),
     "r8":            dict(lora_r=8,  lora_alpha=16, use_elastic=True,  run_name="trocr-lora-r8"),
     "r32":           dict(lora_r=32, lora_alpha=64, use_elastic=True,  run_name="trocr-lora-r32"),
     "r16_noelastic": dict(lora_r=16, lora_alpha=32, use_elastic=False, run_name="trocr-lora-r16-noelastic"),
 }
+
+# Multi-seed replication (2026-09-21, addressing advisor feedback: "each config trained only once
+# is not robust, use 3+ seeds x 3 ranks, report mean +- sd"). seed=42 for each rank is already
+# covered above (the "r8"/"main"/"r32" runs use SEED=42 by default) - this adds 2 more seeds x 3
+# ranks = 6 additional runs, for 3 seeds x 3 ranks = 9 total data points feeding
+# results/phase12_seed_sweep_summary.md. Elastic augmentation is held on throughout (already
+# decided as the primary setting; this sweep is about rank x seed variance, not augmentation).
+_EXTRA_SEEDS = [123, 2024]
+for _seed in _EXTRA_SEEDS:
+    for _rank, _alpha in [(8, 16), (16, 32), (32, 64)]:
+        _ABLATION_PRESETS[f"r{_rank}_seed{_seed}"] = dict(
+            lora_r=_rank, lora_alpha=_alpha, use_elastic=True,
+            run_name=f"trocr-lora-r{_rank}-seed{_seed}", seed=_seed,
+        )
+del _seed, _rank, _alpha
 
 # Extra flags for selectively rerunning part of Phase 2 (avoid redoing work that already has good results):
 RUN_TROCR = False           # already has good results in results_master_phase2.csv (kernel v6) - no need to rerun
@@ -768,9 +788,10 @@ def phase5_qwen_vl():
 # frozen file is needed; simply calling this function again with the same seed reproduces the
 # same test set.
 # ============================================================
-def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="trocr-lora-finetuned"):
+def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="trocr-lora-finetuned",
+                           seed=SEED):
     print(f"\n=== phase6_finetune_trocr: lora_r={lora_r}, lora_alpha={lora_alpha}, "
-          f"use_elastic={use_elastic}, run_name={run_name!r} ===")
+          f"use_elastic={use_elastic}, run_name={run_name!r}, seed={seed} ===")
     output_subdir = run_name.replace("trocr-lora-finetuned", "trocr-lora")  # keeps the old path for the "main" configuration
     # torchao>=0.16.0 is required: the Kaggle base image ships with torchao==0.10.0 (old), and
     # the latest peft refuses to run with the old version (kernel v14: ImportError). Force the
@@ -810,12 +831,13 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
     # --- Data: Training (train, with augmentation) + Validation subsample (monitored during training) ---
     train_df = build_manifest_kaggle_rx("Training")
     val_df_full = build_manifest_kaggle_rx("Validation")
-    val_df = val_df_full.sample(n=min(300, len(val_df_full)), random_state=SEED).reset_index(drop=True)
+    val_df = val_df_full.sample(n=min(300, len(val_df_full)), random_state=seed).reset_index(drop=True)
     print(f"  train_df={len(train_df)}, val_df_full={len(val_df_full)}, val_df (monitoring subsample)={len(val_df)}")
 
     from transformers import (
         TrOCRProcessor, VisionEncoderDecoderModel, VisionEncoderDecoderConfig,
         Seq2SeqTrainer, Seq2SeqTrainingArguments, EarlyStoppingCallback, TrainerCallback,
+        set_seed,
     )
     from peft import LoraConfig, get_peft_model
 
@@ -898,6 +920,12 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
                 control.should_training_stop = True
             return control
 
+    # Seed torch/numpy/python RNGs right before LoRA's A/B matrices are randomly initialized, so
+    # that a different `seed` here actually produces a different LoRA init (needed for the
+    # multi-seed replication in the Limitations section - a single set_seed() call at module
+    # import time is NOT enough, since get_peft_model() draws fresh random weights at this exact
+    # point, not at import time).
+    set_seed(seed)
     lora_config = LoraConfig(
         r=lora_r, lora_alpha=lora_alpha, lora_dropout=0.1,
         target_modules=["query", "value", "q_proj", "v_proj"],
@@ -930,12 +958,12 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
     # full training.
     # ============================================================
     print("\n--- SMOKE TEST: 20 steps on 64 training images ---")
-    smoke_train = RxTorchDataset(train_df.sample(n=min(64, len(train_df)), random_state=SEED),
+    smoke_train = RxTorchDataset(train_df.sample(n=min(64, len(train_df)), random_state=seed),
                                   augmenter=build_train_augmentation(elastic=use_elastic))
     smoke_args = Seq2SeqTrainingArguments(
         output_dir=f"/kaggle/working/smoke-{output_subdir}", per_device_train_batch_size=8,
         max_steps=20, logging_steps=5, save_strategy="no", eval_strategy="no",
-        fp16=(device == "cuda"), report_to=[],
+        fp16=(device == "cuda"), report_to=[], seed=seed,
     )
     smoke_trainer = Seq2SeqTrainer(model=model, args=smoke_args, train_dataset=smoke_train)
     t0 = time.time()
@@ -978,6 +1006,7 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         metric_for_best_model="cer",
         greater_is_better=False,
         report_to=[],
+        seed=seed,
     )
     trainer = Seq2SeqTrainer(
         model=model, args=training_args,
