@@ -1,61 +1,64 @@
 """
-Kaggle Notebook script — Ngay 1-9 cua ke hoach 2 tuan (docs/05-ke-hoach-2-tuan.md).
+Kaggle Notebook script — Days 1-9 of the two-week plan (see docs/05-q2-research-plan.md
+for the current plan).
 
-CACH DUNG:
-1. Vao kaggle.com -> Create -> New Notebook.
-2. O panel phai "Input", bam "+ Add Input", tim va them 2 dataset:
-     - mamun1113/doctors-handwritten-prescription-bd-dataset   (trong tam chinh)
-     - nibinv23/iam-handwriting-word-database                   (doi chung domain-shift)
-3. Settings (panel phai) -> Accelerator -> chon "GPU T4 x2".
-4. Dan TOAN BO noi dung file nay vao 1 cell va chay (Run All).
-   Chay theo tung PHASE (dat CURRENT_PHASE ben duoi) de khong vuot quota GPU/session
-   9h cua Kaggle - moi phase ghi ket qua vao results/results_master.csv (append,
-   khong ghi de) nen co the chay nhieu lan/nhieu ngay khac nhau.
-5. Sau moi phase, bam "Save Version" -> "Save & Run All" de luu output, hoac
-   download truc tiep results_master.csv qua panel Output.
+HOW TO USE:
+1. Go to kaggle.com -> Create -> New Notebook.
+2. In the right-hand "Input" panel, click "+ Add Input", search for and add 2 datasets:
+     - mamun1113/doctors-handwritten-prescription-bd-dataset   (main focus)
+     - nibinv23/iam-handwriting-word-database                   (domain-shift control)
+3. Settings (right-hand panel) -> Accelerator -> select "GPU T4 x2".
+4. Paste the ENTIRE contents of this file into a single cell and run it (Run All).
+   Run one PHASE at a time (set CURRENT_PHASE below) to stay within Kaggle's 9-hour
+   GPU/session quota — each phase appends its results to results/results_master.csv
+   (append, not overwrite), so you can run it across multiple sessions/days.
+5. After each phase, click "Save Version" -> "Save & Run All" to save the output, or
+   download results_master.csv directly via the Output panel.
 
-QUAN TRONG: PHASE 0 la buoc CHAN DOAN - chay truoc, doc output, xac nhan
-ten cot dung voi thuc te truoc khi chay PHASE 1+ (bo du lieu nay co CSV
-"9 columns" ma ta chua xac dinh duoc ten cot chinh xac tu ben ngoai Kaggle,
-nen code o day tu-do-doan qua heuristic va IN RA de ban kiem tra).
+IMPORTANT: PHASE 0 is a DIAGNOSTIC step — run it first, read the output, and confirm
+the column names match reality before running PHASE 1+ (this dataset's CSV has
+"9 columns" whose exact names we could not determine from outside Kaggle, so the code
+here guesses them heuristically and PRINTS them out for you to verify).
 """
 
 import os, glob, json, time, traceback, subprocess, sys
 
-# Bootstrap: cai cac goi khong co san trong Kaggle base image, TRUOC khi import.
-# Chay 1 lan/session (Kaggle giu pip cache trong session nen lan sau nhanh hon).
+# Bootstrap: install packages that aren't available in the Kaggle base image, BEFORE importing them.
+# Runs once per session (Kaggle keeps the pip cache within a session, so later runs are faster).
 def _pip_install(*pkgs):
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", *pkgs], check=False)
 
 
 def _assert_sane_debug_output(model_name, debug_preds, max_avg_len=60):
-    """PHANH KHAN CAP dung chung cho moi VLM moi: neu debug 5 anh dau ra output qua dai/vo
-    nghia (dau hieu hallucination/dtype-sai/thu vien khong tuong thich - xem bai hoc GOT-OCR2.0
-    kernel v8-v10, ~90 phut GPU bi lang phi truoc khi phat hien), DUNG LAI truoc khi chay full
-    1180 anh. Goi ngay sau vong debug, truoc khi vao run_model_on_manifest."""
+    """Shared EMERGENCY BRAKE for every new VLM: if the debug run's first 5 images produce
+    output that is too long/nonsensical (a sign of hallucination, a wrong dtype, or a library
+    incompatibility — see the GOT-OCR2.0 lesson from kernel v8-v10, where ~90 minutes of GPU
+    time were wasted before this was caught), STOP before running the full 1180 images. Call
+    this right after the debug loop, before calling run_model_on_manifest."""
     avg_len = sum(len(p) for p in debug_preds) / max(1, len(debug_preds))
     if avg_len > max_avg_len:
         raise RuntimeError(
-            f"{model_name}: debug output qua dai/vo nghia (trung binh {avg_len:.0f} ky tu cho "
-            f"1 tu/nhan ngan) - nghi loi dtype/thu vien/prompt, xem chi tiet debug_preds o tren. "
-            f"DUNG LAI, KHONG chay full 1180 anh."
+            f"{model_name}: debug output is too long/nonsensical (average {avg_len:.0f} characters "
+            f"for a single short word/label) - suspect a dtype/library/prompt issue, see debug_preds "
+            f"above for details. STOP, DO NOT run the full 1180 images."
         )
 
 _pip_install("jiwer", "rapidfuzz", "openpyxl", "pytesseract", "easyocr")
-os.system("apt-get install -y tesseract-ocr -q > /tmp/apt.log 2>&1")  # Kaggle kernel chay quyen root
+os.system("apt-get install -y tesseract-ocr -q > /tmp/apt.log 2>&1")  # Kaggle kernel runs with root privileges
 
 import pandas as pd
 import numpy as np
 
 # ============================================================
-# CAU HINH
+# CONFIGURATION
 # ============================================================
-CURRENT_PHASE = 6   # 0=chan doan, 1=OCR co dien, 2=TrOCR+Donut, 3=GOT-OCR2.0,
-                     # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(tuy chon) API dong
+CURRENT_PHASE = 6   # 0=diagnostics, 1=classical OCR, 2=TrOCR+Donut, 3=GOT-OCR2.0,
+                     # 4=PaddleOCR-VL, 5=Qwen-VL, 6=(optional) closed API
 
-# Chon cau hinh ablation se chay khi CURRENT_PHASE == 6 (moi kernel push chay 1 cau hinh,
-# doi ABLATION_CONFIG roi push kernel moi cho cau hinh tiep theo - xem results/phase7b_ablation_summary.md).
-# "main" (r=16, elastic=True) DA CHAY XONG (kernel v20) - khong can chay lai.
+# Choose which ablation configuration to run when CURRENT_PHASE == 6 (each kernel push runs
+# one configuration - change ABLATION_CONFIG and push a new kernel for the next configuration,
+# see results/phase7b_ablation_summary.md).
+# "main" (r=16, elastic=True) HAS ALREADY BEEN RUN (kernel v20) - no need to rerun.
 ABLATION_CONFIG = "r16_noelastic"   # "main" | "r8" | "r32" | "r16_noelastic"
 _ABLATION_PRESETS = {
     "main":          dict(lora_r=16, lora_alpha=32, use_elastic=True,  run_name="trocr-lora-finetuned"),
@@ -64,9 +67,9 @@ _ABLATION_PRESETS = {
     "r16_noelastic": dict(lora_r=16, lora_alpha=32, use_elastic=False, run_name="trocr-lora-r16-noelastic"),
 }
 
-# Cac co phu de tai-chay mot phan Phase 2 (tranh lam lai viec da co ket qua tot):
-RUN_TROCR = False           # da co ket qua tot o results_master_phase2.csv (kernel v6) - khong can chay lai
-RUN_DONUT_RAW_FULL = False  # da co ket qua (that bai gan 100%) o kernel v6 - chi chay lai PADDED lan nay
+# Extra flags for selectively rerunning part of Phase 2 (avoid redoing work that already has good results):
+RUN_TROCR = False           # already has good results in results_master_phase2.csv (kernel v6) - no need to rerun
+RUN_DONUT_RAW_FULL = False  # already has results (near-100% failure) from kernel v6 - only rerun PADDED this time
 
 RESULTS_DIR = "/kaggle/working/results"
 os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -74,15 +77,15 @@ RESULTS_CSV = f"{RESULTS_DIR}/results_master.csv"
 
 def _resolve_root(slug, owner):
     """Kaggle's newer container mounts datasets under /kaggle/input/datasets/<owner>/<slug>/
-    instead of the classic flat /kaggle/input/<slug>/ - xac nhan qua chay thuc te 16/09/2026
-    (os.listdir('/kaggle/input') = ['datasets']). Thu ca 2 kieu, uu tien kieu moi truoc."""
+    instead of the classic flat /kaggle/input/<slug>/ - confirmed via an actual run on 2026-09-16
+    (os.listdir('/kaggle/input') = ['datasets']). Try both layouts, preferring the newer one first."""
     for cand in [
         f"/kaggle/input/datasets/{owner}/{slug}",
         f"/kaggle/input/{slug}",
     ]:
         if os.path.isdir(cand):
             return cand
-    return f"/kaggle/input/{slug}"  # fallback de bao loi ro rang o phase0_diagnose
+    return f"/kaggle/input/{slug}"  # fallback, so phase0_diagnose reports a clear error
 
 
 RX_ROOT = _resolve_root("doctors-handwritten-prescription-bd-dataset", "mamun1113")
@@ -100,48 +103,49 @@ DRUG_VOCAB = [
     "Azyth", "Cetisoft", "Dancel", "Tridosil", "Nizoder", "Ketoral", "Ketocon",
     "Ketotab", "Ketozol", "Denixil", "Provair", "Odmon", "Baclofen", "MKast",
     "Trilock", "Flexibac",
-]  # 78 classes, ung theo Data Card cua dataset tren Kaggle (da xac nhan qua browser 15/09/2026)
+]  # 78 classes, matching the dataset's Data Card on Kaggle (confirmed via browser on 2026-09-15)
 
 SEED = 42
 np.random.seed(SEED)
 
 
 def _find_iam_words_txt():
-    """words.txt xac nhan nam tai IAM_ROOT/iam_words/words.txt (kernel v3 log, 16/09/2026).
-    Thu duong dan biet truoc TRUOC, chi recursive-glob (cham, quet ~115K anh) khi that su can."""
+    """words.txt is confirmed to live at IAM_ROOT/iam_words/words.txt (kernel v3 log, 2026-09-16).
+    Try the known path FIRST, and only fall back to a recursive glob (slow, scans ~115K images)
+    when it's actually needed."""
     direct = f"{IAM_ROOT}/iam_words/words.txt"
     if os.path.exists(direct):
         return [direct]
     return glob.glob(f"{IAM_ROOT}/**/words.txt", recursive=True)
 
 # ============================================================
-# PHASE 0 — CHAN DOAN CAU TRUC DU LIEU (chay truoc tien, luon chay)
+# PHASE 0 — DIAGNOSE THE DATA STRUCTURE (run first, always run)
 # ============================================================
 def phase0_diagnose():
     print("=" * 70)
-    print("PHASE 0: Kiem tra cau truc /kaggle/input/")
+    print("PHASE 0: Checking the structure of /kaggle/input/")
     print("=" * 70)
-    print("os.listdir('/kaggle/input') =", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "KHONG CO THU MUC /kaggle/input")
+    print("os.listdir('/kaggle/input') =", os.listdir("/kaggle/input") if os.path.isdir("/kaggle/input") else "NO /kaggle/input DIRECTORY")
     if os.path.isdir("/kaggle/input/datasets"):
         for owner in os.listdir("/kaggle/input/datasets"):
             owner_path = f"/kaggle/input/datasets/{owner}"
             print(f"  /kaggle/input/datasets/{owner}/ ->", os.listdir(owner_path) if os.path.isdir(owner_path) else "?")
-    print(f"RX_ROOT da resolve = {RX_ROOT}  (ton tai: {os.path.isdir(RX_ROOT)})")
-    print(f"IAM_ROOT da resolve = {IAM_ROOT}  (ton tai: {os.path.isdir(IAM_ROOT)})")
+    print(f"RX_ROOT resolved to = {RX_ROOT}  (exists: {os.path.isdir(RX_ROOT)})")
+    print(f"IAM_ROOT resolved to = {IAM_ROOT}  (exists: {os.path.isdir(IAM_ROOT)})")
     for root in [RX_ROOT, IAM_ROOT]:
         print(f"\n--- {root} ---")
         if not os.path.isdir(root):
-            print("  KHONG TON TAI - kiem tra lai ten dataset da Add Input dung chua.")
+            print("  DOES NOT EXIST - double-check that the dataset name was added correctly via Add Input.")
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             depth = dirpath.replace(root, "").count(os.sep)
             if depth >= 2:
-                dirnames[:] = []  # dung khong de os.walk lan sau vao (IAM co ~115K anh, rat cham neu khong prune)
+                dirnames[:] = []  # stop os.walk from descending further (IAM has ~115K images, very slow without pruning)
             print(f"  {dirpath}/  ({len(filenames)} files, {len(dirnames)} subdirs)")
             for fn in filenames[:5]:
                 print(f"      - {fn}")
 
-    print("\n--- Doc thu cac file .csv/.xlsx trong RX_ROOT ---")
+    print("\n--- Trying to read .csv/.xlsx files in RX_ROOT ---")
     for path in glob.glob(f"{RX_ROOT}/**/*.csv", recursive=True) + glob.glob(f"{RX_ROOT}/**/*.xlsx", recursive=True):
         print(f"\n  File: {path}")
         try:
@@ -149,20 +153,20 @@ def phase0_diagnose():
             print("  Columns:", list(df.columns))
             print(df.head(3).to_string())
         except Exception as e:
-            print("  LOI DOC FILE:", e)
+            print("  FILE READ ERROR:", e)
 
-    print("\n--- Doc thu words.txt cua IAM (dinh dang chuan: word_id status graylevel x y w h tag transcription) ---")
+    print("\n--- Trying to read the IAM words.txt (standard format: word_id status graylevel x y w h tag transcription) ---")
     for path in _find_iam_words_txt()[:1]:
         print(f"  File: {path}")
         with open(path, encoding="utf-8", errors="replace") as f:
             lines = [l for l in f.readlines() if not l.startswith("#")]
-        print(f"  So dong (khong tinh comment): {len(lines)}")
-        print("  3 dong dau:", lines[:3])
+        print(f"  Line count (excluding comments): {len(lines)}")
+        print("  First 3 lines:", lines[:3])
 
 
 def guess_image_and_label_columns(df: pd.DataFrame, vocab: list[str]):
-    """Heuristic: cot anh la cot co string ket thuc .jpg/.png/.jpeg;
-    cot nhan la cot co gia tri trung nhieu nhat voi vocab 78 thuoc."""
+    """Heuristic: the image column is the column whose strings end in .jpg/.png/.jpeg;
+    the label column is the column whose values overlap the most with the 78-drug vocabulary."""
     vocab_lower = {v.lower() for v in vocab}
     img_col, label_col = None, None
     best_overlap = -1
@@ -175,12 +179,12 @@ def guess_image_and_label_columns(df: pd.DataFrame, vocab: list[str]):
         if overlap > best_overlap:
             best_overlap = overlap
             label_col = col
-    print(f"  -> Doan: image_col={img_col!r}, label_col={label_col!r} (overlap voi vocab: {best_overlap:.2%})")
+    print(f"  -> Guessed: image_col={img_col!r}, label_col={label_col!r} (overlap with vocab: {best_overlap:.2%})")
     return img_col, label_col
 
 
 # ============================================================
-# METRICS — ban sao cua src/metrics.py (giu dong bo 2 noi, xem README o day)
+# METRICS — a copy of src/metrics.py (kept in sync in both places, see the README here)
 # ============================================================
 import jiwer
 from rapidfuzz.distance import Levenshtein
@@ -225,7 +229,7 @@ def is_degenerate(hypothesis, max_len=200):
 
 
 # ============================================================
-# GHI KET QUA — APPEND, khong ghi de, de chiu duoc session timeout
+# WRITING RESULTS — APPEND, not overwrite, to be resilient to session timeouts
 # ============================================================
 def append_results(rows: list[dict]):
     df_new = pd.DataFrame(rows)
@@ -233,11 +237,11 @@ def append_results(rows: list[dict]):
         df_new.to_csv(RESULTS_CSV, mode="a", header=False, index=False)
     else:
         df_new.to_csv(RESULTS_CSV, mode="w", header=True, index=False)
-    print(f"  Da ghi {len(rows)} dong vao {RESULTS_CSV}")
+    print(f"  Wrote {len(rows)} rows to {RESULTS_CSV}")
 
 
 def run_model_on_manifest(model_name, predict_fn, manifest_df, dataset_name, batch_log_every=50):
-    """predict_fn(image_path) -> str (van ban du doan). Loi tung anh khong lam sap ca batch."""
+    """predict_fn(image_path) -> str (the predicted text). A per-image error does not crash the whole batch."""
     rows = []
     t0 = time.time()
     for i, r in manifest_df.iterrows():
@@ -245,7 +249,7 @@ def run_model_on_manifest(model_name, predict_fn, manifest_df, dataset_name, bat
             hyp = predict_fn(r["image_path"])
         except Exception as e:
             hyp = ""
-            print(f"  [LOI anh {r['image_path']}]: {e}")
+            print(f"  [ERROR on image {r['image_path']}]: {e}")
         row = {
             "model": model_name,
             "dataset": dataset_name,
@@ -264,29 +268,29 @@ def run_model_on_manifest(model_name, predict_fn, manifest_df, dataset_name, bat
         rows.append(row)
         if (i + 1) % batch_log_every == 0:
             elapsed = time.time() - t0
-            print(f"  [{model_name}/{dataset_name}] {i+1}/{len(manifest_df)} anh, {elapsed:.1f}s, "
-                  f"CER trung binh tam thoi = {np.mean([x['cer'] for x in rows]):.3f}")
+            print(f"  [{model_name}/{dataset_name}] {i+1}/{len(manifest_df)} images, {elapsed:.1f}s, "
+                  f"running average CER = {np.mean([x['cer'] for x in rows]):.3f}")
     append_results(rows)
     return pd.DataFrame(rows)
 
 
 # ============================================================
-# BUILD MANIFEST — tu-nhan-dien cot anh/nhan, khong can biet truoc ten cot
+# BUILDING THE MANIFEST — auto-detects the image/label columns, no need to know the column names in advance
 # ============================================================
 def build_manifest_kaggle_rx(split_dirname_prefix, n_sample=None):
-    """split_dirname_prefix: 'Testing', 'Training', hoac 'Validation'.
-    Dataset that long them 1 cap thu muc trung gian ten theo tieu de dataset
-    (vi du '.../Doctor's Handwritten Prescription BD dataset/Testing/...') -
-    xac nhan qua chay thuc te 16/09/2026 (kernel v3 log) - nen tim de quy thay vi
-    gia dinh Testing/Training/Validation nam ngay duoi RX_ROOT."""
+    """split_dirname_prefix: 'Testing', 'Training', or 'Validation'.
+    The dataset actually nests an extra intermediate directory named after the dataset title
+    (e.g. '.../Doctor's Handwritten Prescription BD dataset/Testing/...') - confirmed via an
+    actual run on 2026-09-16 (kernel v3 log) - so we search recursively instead of assuming
+    Testing/Training/Validation sit directly under RX_ROOT."""
     label_files = glob.glob(f"{RX_ROOT}/**/{split_dirname_prefix}/*.csv", recursive=True) + \
                   glob.glob(f"{RX_ROOT}/**/{split_dirname_prefix}/*.xlsx", recursive=True)
     if not label_files:
-        raise FileNotFoundError(f"Khong tim thay label file duoi {RX_ROOT}/**/{split_dirname_prefix}/")
+        raise FileNotFoundError(f"No label file found under {RX_ROOT}/**/{split_dirname_prefix}/")
     path = label_files[0]
     df = pd.read_csv(path) if path.endswith(".csv") else pd.read_excel(path)
     img_col, label_col = guess_image_and_label_columns(df, DRUG_VOCAB)
-    split_dir = os.path.dirname(path)  # thu muc Testing/Training/Validation thuc te
+    split_dir = os.path.dirname(path)  # the actual Testing/Training/Validation directory
     img_dir_candidates = [d for d in glob.glob(f"{split_dir}/*/") if os.path.isdir(d)]
     img_dir = img_dir_candidates[0] if img_dir_candidates else split_dir
     print(f"  split_dir={split_dir!r}, img_dir={img_dir!r}")
@@ -297,31 +301,32 @@ def build_manifest_kaggle_rx(split_dirname_prefix, n_sample=None):
         if os.path.exists(direct):
             return direct
         hits = glob.glob(f"{img_dir}/**/{fname}", recursive=True)
-        return hits[0] if hits else direct  # co the khong ton tai - se bao loi khi doc anh
+        return hits[0] if hits else direct  # may not exist - will raise an error when the image is read
 
     manifest = pd.DataFrame({
         "image_path": df[img_col].map(resolve_path),
         "label": df[label_col],
     })
     manifest = manifest[manifest["image_path"].map(os.path.exists)].reset_index(drop=True)
-    print(f"  build_manifest_kaggle_rx({split_dirname_prefix}): {len(manifest)}/{len(df)} anh tim duoc tren dia")
+    print(f"  build_manifest_kaggle_rx({split_dirname_prefix}): {len(manifest)}/{len(df)} images found on disk")
     if n_sample and n_sample < len(manifest):
         manifest = manifest.sample(n=n_sample, random_state=SEED).reset_index(drop=True)
     return manifest
 
 
 def build_manifest_iam(n_sample=400):
-    """Doc words.txt chuan IAM: word_id status graylevel x y w h tag transcription.
-    word_id dang a01-000u-00-00 -> anh tai IAM_ROOT/iam_words/words/a01/a01-000u/a01-000u-00-00.png
-    (cau truc xac nhan qua kernel v3 log, 16/09/2026).
+    """Reads the standard IAM words.txt format: word_id status graylevel x y w h tag transcription.
+    word_id looks like a01-000u-00-00 -> image at IAM_ROOT/iam_words/words/a01/a01-000u/a01-000u-00-00.png
+    (structure confirmed via kernel v3 log, 2026-09-16).
 
-    QUAN TRONG VE HIEU NANG: parse+sample TRUOC, chi dung cho o dia (os.path.exists/glob)
-    SAU KHI da sample xuong n_sample dong — words.txt co 44.565 dong, neu glob cho tung
-    dong roi moi sample thi se cham (44K recursive glob) trong khi ta chi can vai tram anh."""
+    IMPORTANT PERFORMANCE NOTE: parse and sample FIRST, only hit disk (os.path.exists/glob)
+    AFTER sampling down to n_sample rows — words.txt has 44,565 lines, and globbing for every
+    line before sampling would be slow (44K recursive globs) when we only need a few hundred
+    images."""
     words_txt = _find_iam_words_txt()
     if not words_txt:
-        raise FileNotFoundError(f"Khong tim thay words.txt trong {IAM_ROOT}")
-    words_dir = f"{IAM_ROOT}/iam_words/words"  # fallback: do tim neu cau truc khac
+        raise FileNotFoundError(f"words.txt not found under {IAM_ROOT}")
+    words_dir = f"{IAM_ROOT}/iam_words/words"  # fallback: search for it if the structure differs
 
     parsed = []
     with open(words_txt[0], encoding="utf-8", errors="replace") as f:
@@ -330,11 +335,11 @@ def build_manifest_iam(n_sample=400):
                 continue
             parts = line.strip().split(" ")
             if len(parts) < 9:
-                continue  # dong khong du 9 truong theo dinh dang chuan IAM - bo qua, khong crash
+                continue  # line doesn't have all 9 fields per the standard IAM format - skip it, don't crash
             word_id, status, transcription = parts[0], parts[1], parts[-1]
             if status == "ok":
                 parsed.append((word_id, transcription))
-    print(f"  words.txt: {len(parsed)} dong 'ok' hop le (truoc khi sample)")
+    print(f"  words.txt: {len(parsed)} valid 'ok' lines (before sampling)")
 
     rng = np.random.default_rng(SEED)
     if n_sample and n_sample < len(parsed):
@@ -348,18 +353,18 @@ def build_manifest_iam(n_sample=400):
         if os.path.exists(direct):
             path = direct
         else:
-            hits = glob.glob(f"{IAM_ROOT}/**/{word_id}.png", recursive=True)  # fallback hiem gap, cham
+            hits = glob.glob(f"{IAM_ROOT}/**/{word_id}.png", recursive=True)  # rare, slow fallback
             path = hits[0] if hits else None
         if path:
             rows.append({"image_path": path, "label": transcription})
     manifest = pd.DataFrame(rows)
-    print(f"  build_manifest_iam: {len(manifest)}/{len(parsed)} anh da sample tim duoc tren dia")
+    print(f"  build_manifest_iam: {len(manifest)}/{len(parsed)} sampled images found on disk")
     return manifest
 
 
 # ============================================================
-# PHASE 1 — OCR co dien: Tesseract (+ EasyOCR neu da pip install)
-# Cell truoc do phai chay: !apt-get install -y tesseract-ocr -q && pip install pytesseract easyocr -q
+# PHASE 1 — Classical OCR: Tesseract (+ EasyOCR if pip-installed)
+# The previous cell must have run: !apt-get install -y tesseract-ocr -q && pip install pytesseract easyocr -q
 # ============================================================
 def phase1_classical_ocr():
     import pytesseract
@@ -371,9 +376,9 @@ def phase1_classical_ocr():
     rx_test = build_manifest_kaggle_rx("Testing")
     iam_sub = build_manifest_iam(n_sample=400)
 
-    print("\n--- Tesseract tren Kaggle-Rx (Testing, toan bo) ---")
+    print("\n--- Tesseract on Kaggle-Rx (Testing, full set) ---")
     run_model_on_manifest("tesseract", tesseract_predict, rx_test, "kaggle_rx")
-    print("\n--- Tesseract tren IAM (subsample 400) ---")
+    print("\n--- Tesseract on IAM (subsample of 400) ---")
     run_model_on_manifest("tesseract", tesseract_predict, iam_sub, "iam")
 
     try:
@@ -384,12 +389,12 @@ def phase1_classical_ocr():
             res = reader.readtext(path, detail=0)
             return " ".join(res)
 
-        print("\n--- EasyOCR tren Kaggle-Rx (Testing, toan bo) ---")
+        print("\n--- EasyOCR on Kaggle-Rx (Testing, full set) ---")
         run_model_on_manifest("easyocr", easyocr_predict, rx_test, "kaggle_rx")
-        print("\n--- EasyOCR tren IAM (subsample 400) ---")
+        print("\n--- EasyOCR on IAM (subsample of 400) ---")
         run_model_on_manifest("easyocr", easyocr_predict, iam_sub, "iam")
     except ImportError:
-        print("easyocr chua duoc cai — bo qua, chay lai sau khi `pip install easyocr`.")
+        print("easyocr is not installed yet — skipping; rerun after `pip install easyocr`.")
 
 
 # ============================================================
@@ -408,7 +413,7 @@ def phase2_trocr_donut():
 
     # --- TrOCR ---
     if not RUN_TROCR:
-        print("  RUN_TROCR=False - bo qua (da co ket qua tot tu lan chay truoc, xem results_master_phase2.csv)")
+        print("  RUN_TROCR=False - skipping (already has good results from a previous run, see results_master_phase2.csv)")
     else:
         try:
             from transformers import TrOCRProcessor, VisionEncoderDecoderModel
@@ -424,25 +429,28 @@ def phase2_trocr_donut():
                 ids = trocr_model.generate(pixel_values, max_new_tokens=32)
                 return trocr_processor.batch_decode(ids, skip_special_tokens=True)[0]
 
-            print("\n--- TrOCR-large-handwritten tren Kaggle-Rx (Testing, toan bo) ---")
+            print("\n--- TrOCR-large-handwritten on Kaggle-Rx (Testing, full set) ---")
             run_model_on_manifest("trocr-large-handwritten", trocr_predict, rx_test, "kaggle_rx")
-            print("\n--- TrOCR-large-handwritten tren IAM (subsample 400) ---")
+            print("\n--- TrOCR-large-handwritten on IAM (subsample of 400) ---")
             run_model_on_manifest("trocr-large-handwritten", trocr_predict, iam_sub, "iam")
             del trocr_model
             torch.cuda.empty_cache() if device == "cuda" else None
         except Exception as e:
-            print(f"  [LOI TrOCR, bo qua model nay]: {e}")
+            print(f"  [TrOCR ERROR, skipping this model]: {e}")
             traceback.print_exc()
 
-    # --- Donut-base (zero-shot doc-reading qua task prompt <s_synthdog>, KHONG dung ban fine-tune CORD -
-    #     ban CORD la trich xuat truong hoa don, khac muc tieu free-text OCR o day) ---
+    # --- Donut-base (zero-shot document reading via the <s_synthdog> task prompt, NOT the
+    #     fine-tuned CORD checkpoint — the CORD checkpoint does receipt field extraction, a
+    #     different goal from the free-text OCR here) ---
     #
-    # PHAT HIEN (kernel v6, 16/09/2026): cach dung "chuan" (crop nho dua thang vao processor)
-    # cho ra hypothesis RONG ~100% (degenerate_rate ~1.0 ca 2 dataset). Gia thuyet: donut-base
-    # (chi pretrain SynthDoG, CHUA fine-tune) duoc train tren anh trang tai lieu day du (page-shaped,
-    # ty le rong-cao lon) - anh crop 1 tu nho (gan vuong) qua khac phan phoi input khien processor
-    # resize/pad thanh mot "trang" gan nhu trong -> model doan ngay EOS. Test CA 2 cach, bao cao ca 2
-    # de lam ro day la van de "ap dung sai kieu du lieu" chu khong phai loi code don thuan.
+    # FINDING (kernel v6, 2026-09-16): the "standard" approach (feeding the small crop directly
+    # into the processor) produces an EMPTY hypothesis ~100% of the time (degenerate_rate ~1.0 on
+    # both datasets). Hypothesis: donut-base (only pretrained on SynthDoG, NOT fine-tuned) was
+    # trained on full document page images (page-shaped, wide aspect ratio) — a small, roughly
+    # square single-word crop is far enough outside that input distribution that the processor's
+    # resize/pad turns it into an almost-blank "page" -> the model immediately predicts EOS. Test
+    # BOTH approaches, report both, to make clear this is a "wrong input shape" issue rather than
+    # a plain code bug.
     try:
         import re as _re
         from transformers import DonutProcessor, VisionEncoderDecoderModel as DonutVED
@@ -456,7 +464,7 @@ def phase2_trocr_donut():
         ).input_ids.to(device)
 
         def _pad_to_page_canvas(image, canvas_size=(1280, 960)):
-            """Dan anh crop nho vao giua 1 'trang' trang - mo phong ty le anh SynthDoG duoc train."""
+            """Pastes the small crop into the middle of a blank 'page' — mimicking the aspect ratio SynthDoG was trained on."""
             canvas = Image.new("RGB", canvas_size, (255, 255, 255))
             w, h = image.size
             scale = min(canvas_size[0] * 0.6 / w, canvas_size[1] * 0.6 / h, 4.0)
@@ -491,8 +499,8 @@ def phase2_trocr_donut():
             pixel_values = donut_processor(image, return_tensors="pt").pixel_values.to(device)
             return _donut_generate(pixel_values)
 
-        # Debug nhanh: in 5 output tho (chua qua run_model_on_manifest) de xac nhan truc quan
-        print("\n--- Donut DEBUG: 5 vi du dau cua rx_test, ca 2 cach (raw vs padded) ---")
+        # Quick debug: print 5 raw outputs (not yet through run_model_on_manifest) for a visual sanity check
+        print("\n--- Donut DEBUG: first 5 examples from rx_test, both approaches (raw vs padded) ---")
         for i in range(min(5, len(rx_test))):
             row = rx_test.iloc[i]
             raw = donut_predict_raw(row["image_path"])
@@ -500,33 +508,34 @@ def phase2_trocr_donut():
             print(f"  ref={row['label']!r}  raw={raw!r}  padded={padded!r}")
 
         if RUN_DONUT_RAW_FULL:
-            print("\n--- Donut-base (<s_synthdog>, RAW - crop truc tiep) tren Kaggle-Rx ---")
+            print("\n--- Donut-base (<s_synthdog>, RAW - direct crop) on Kaggle-Rx ---")
             run_model_on_manifest("donut-base-synthdog-raw", donut_predict_raw, rx_test, "kaggle_rx")
-            print("\n--- Donut-base (<s_synthdog>, RAW) tren IAM (subsample 400) ---")
+            print("\n--- Donut-base (<s_synthdog>, RAW) on IAM (subsample of 400) ---")
             run_model_on_manifest("donut-base-synthdog-raw", donut_predict_raw, iam_sub, "iam")
         else:
-            print("  RUN_DONUT_RAW_FULL=False - bo qua (da co du lieu 'raw' tu kernel v6, xem results_master_phase2.csv, model='donut-base-synthdog')")
+            print("  RUN_DONUT_RAW_FULL=False - skipping (already have 'raw' data from kernel v6, see results_master_phase2.csv, model='donut-base-synthdog')")
 
-        print("\n--- Donut-base (<s_synthdog>, PADDED - dan vao 'trang' trang) tren Kaggle-Rx ---")
+        print("\n--- Donut-base (<s_synthdog>, PADDED - pasted onto a blank 'page') on Kaggle-Rx ---")
         run_model_on_manifest("donut-base-synthdog-padded", donut_predict_padded, rx_test, "kaggle_rx")
-        print("\n--- Donut-base (<s_synthdog>, PADDED) tren IAM (subsample 400) ---")
+        print("\n--- Donut-base (<s_synthdog>, PADDED) on IAM (subsample of 400) ---")
         run_model_on_manifest("donut-base-synthdog-padded", donut_predict_padded, iam_sub, "iam")
     except Exception as e:
-        print(f"  [LOI Donut, bo qua model nay]: {e}")
+        print(f"  [Donut ERROR, skipping this model]: {e}")
         traceback.print_exc()
 
 
 # ============================================================
-# PHASE 3 — GOT-OCR2.0 (stepfun-ai, ~580M, VLM chuyen OCR the he moi)
+# PHASE 3 — GOT-OCR2.0 (stepfun-ai, ~580M, a new-generation OCR-specialized VLM)
 # ============================================================
 def phase3_got_ocr2():
-    # QUAN TRONG (kernel v10): transformers moi nhat tu pip la 5.0.0 (major version rat moi,
-    # 09/2026). GOT-OCR2.0 duoc merge vao transformers ngay 2025-01-31 (PR #34721), on dinh
-    # qua nhieu ban 4.x (~4.57.0) nhung CHUA chac tuong thich voi buoc nhay major 5.0.0 (co the
-    # co breaking change noi bo ve generate()/cache lam hong modeling_got_ocr2.py). Prompt/anh
-    # da xac nhan dung (kernel v10: input_ids co dung token <img>...OCR:..., pixel_values dung
-    # shape) nhung output van hoan toan vo nghia -> ghim lai ban 4.57.0 (on dinh, sau khi model
-    # nay duoc merge, truoc buoc nhay v5) thay vi de pip tu chon ban moi nhat.
+    # IMPORTANT (kernel v10): the latest transformers from pip is 5.0.0 (a very recent major
+    # version, 09/2026). GOT-OCR2.0 was merged into transformers on 2025-01-31 (PR #34721) and
+    # was stable across several 4.x releases (~4.57.0), but is not confirmed compatible with the
+    # 5.0.0 major bump (there could be an internal breaking change in generate()/cache handling
+    # that broke modeling_got_ocr2.py). The prompt/image were confirmed correct (kernel v10:
+    # input_ids has the right <img>...OCR:... tokens, pixel_values has the right shape), but the
+    # output was still complete nonsense -> pin to 4.57.0 (stable, after this model was merged
+    # but before the v5 jump) instead of letting pip pick the latest version.
     _pip_install("transformers==4.57.0", "accelerate")
     import torch
     from PIL import Image
@@ -544,15 +553,18 @@ def phase3_got_ocr2():
         from transformers import AutoProcessor, AutoModelForImageTextToText
 
         got_processor = AutoProcessor.from_pretrained("stepfun-ai/GOT-OCR-2.0-hf")
-        # QUAN TRONG: T4 (kien truc Turing) KHONG co tensor core ho tro bfloat16 that su -
-        # kernel v8 dung bfloat16 cho ra output hon loan da ngon ngu, hoan toan sai (CER~55-120,
-        # tuc dai gap hang chuc lan tham chieu) - nghi do loi so hoc ngam khi ep bf16 tren phan cung
-        # khong ho tro dung. Doi sang float16 (T4 ho tro tot, Turing co Tensor Core fp16 that).
-        # KERNEL v9: fp16 van cho output hon loan tuong tu -> khong phai (chi) do dtype.
-        # Thu lai: (a) truyen THANG duong dan/PIL nhu vi du chinh thuc (khong .convert("RGB")
-        # thu cong truoc), (b) in kich thuoc/dtype cua pixel_values de kiem tra anh co thuc su
-        # duoc encode khong hay model dang "phot lo" anh va tu do sinh van ban (giai thich duoc
-        # kieu loi "chat lung tung, da ngon ngu" da thay).
+        # IMPORTANT: the T4 (Turing architecture) does NOT have tensor cores with genuine
+        # bfloat16 support — kernel v8 used bfloat16 and produced garbled, multi-language,
+        # completely wrong output (CER ~55-120, i.e. tens of times longer than the reference) —
+        # suspected silent numerical error from forcing bf16 on hardware that doesn't properly
+        # support it. Switched to float16 (T4 supports this well, Turing has real fp16 Tensor
+        # Cores).
+        # KERNEL v9: fp16 still produced similarly garbled output -> not (solely) a dtype issue.
+        # Trying again: (a) pass the path/PIL image directly as in the official example (no
+        # manual .convert("RGB") beforehand), (b) print the shape/dtype of pixel_values to check
+        # whether the image is actually being encoded or the model is "ignoring" the image and
+        # generating text from scratch (which would explain the "garbled, multi-language"
+        # failure mode seen).
         got_model = AutoModelForImageTextToText.from_pretrained(
             "stepfun-ai/GOT-OCR-2.0-hf", dtype=torch.float16 if device == "cuda" else torch.float32
         ).to(device)
@@ -568,7 +580,7 @@ def phase3_got_ocr2():
                     if hasattr(v, "shape"):
                         print(f"    {k}: shape={tuple(v.shape)} dtype={v.dtype}")
                 prompt_text = got_processor.tokenizer.decode(inputs["input_ids"][0])
-                print(f"    decoded prompt (input_ids truoc generate) = {prompt_text!r}")
+                print(f"    decoded prompt (input_ids before generate) = {prompt_text!r}")
             generate_ids = got_model.generate(
                 **inputs,
                 do_sample=False,
@@ -581,7 +593,7 @@ def phase3_got_ocr2():
             )
             return text.strip()
 
-        print("\n--- Debug: 5 vi du dau GOT-OCR2.0 tren rx_test (dtype=float16) ---")
+        print("\n--- Debug: first 5 examples of GOT-OCR2.0 on rx_test (dtype=float16) ---")
         debug_preds = []
         for i in range(min(5, len(rx_test))):
             row = rx_test.iloc[i]
@@ -591,43 +603,43 @@ def phase3_got_ocr2():
 
         _assert_sane_debug_output("GOT-OCR2.0", debug_preds)
 
-        print("\n--- GOT-OCR2.0 tren Kaggle-Rx (Testing, toan bo) ---")
+        print("\n--- GOT-OCR2.0 on Kaggle-Rx (Testing, full set) ---")
         run_model_on_manifest("got-ocr2.0", got_predict, rx_test, "kaggle_rx")
-        print("\n--- GOT-OCR2.0 tren IAM (subsample 400) ---")
+        print("\n--- GOT-OCR2.0 on IAM (subsample of 400) ---")
         run_model_on_manifest("got-ocr2.0", got_predict, iam_sub, "iam")
     except Exception as e:
-        print(f"  [LOI GOT-OCR2.0, bo qua model nay]: {e}")
+        print(f"  [GOT-OCR2.0 ERROR, skipping this model]: {e}")
         traceback.print_exc()
 
 
 # ============================================================
-# PHASE 4 — PaddleOCR-VL (0.9B, element-level recognition qua transformers)
+# PHASE 4 — PaddleOCR-VL (0.9B, element-level recognition via transformers)
 # ============================================================
 def phase4_paddleocr_vl():
     # ============================================================================
-    # DA LOAI KHOI BENCHMARK (16/09/2026) - LOI TUONG THICH THUONG NGUON, KHONG PHAI LOI O DAY.
+    # REMOVED FROM THE BENCHMARK (2026-09-16) - UPSTREAM COMPATIBILITY BUG, NOT A BUG IN THIS CODE.
     # ============================================================================
     # kernel v12: transformers==4.57.0 -> TypeError: create_causal_mask() got an unexpected
-    # keyword argument 'inputs_embeds' (trong modeling_paddleocr_vl.py tai remote_code cua
-    # chinh HF repo PaddlePaddle/PaddleOCR-VL, khong phai code cua ta).
-    # Da tra cuu: day la loi CONG DONG DA BAO CAO, CHUA CO GIAI PHAP tinh den nay -
-    # xem thao luan "Newest commit breaks compatibility with transformers==4.57.6,
-    # while 5.3.0 is broken as well" tai
+    # keyword argument 'inputs_embeds' (in modeling_paddleocr_vl.py from the remote_code of the
+    # HF repo PaddlePaddle/PaddleOCR-VL itself, not our code).
+    # Looked it up: this is a bug the COMMUNITY HAS ALREADY REPORTED, with NO FIX so far -
+    # see the discussion "Newest commit breaks compatibility with transformers==4.57.6,
+    # while 5.3.0 is broken as well" at
     # https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.5/discussions/22
-    # (dong 30/04, khong co ban ghi giai phap; nguyen van: "Anything above transformers==5
-    # with AutoModelForImageTextToText has seemingly always been broken"). Tuc la PaddleOCR-VL
-    # qua duong transformers/trust_remote_code hien khong hoat dong on dinh o BAT KY version
-    # transformers nao da thu (ca truoc va sau 5.0), khong lien quan gi den T4/dtype/prompt cua ta.
-    # QUYET DINH: LOAI PaddleOCR-VL khoi benchmark zero-shot (khong dang chi phi debug them mot
-    # loi thuong nguon chua co fix) - chuyen sang Phase 5 (Qwen-VL, he sinh thai on dinh hon
-    # nhieu, da co tien le Unsloth chay tren T4). Ghi lai code o day de tham khao/thu lai sau
-    # neu PaddlePaddle phat hanh ban fix.
-    print("  [BO QUA] PaddleOCR-VL loai khoi benchmark do loi tuong thich thuong nguon "
-          "(transformers/trust_remote_code) chua co fix - xem comment code va "
-          "results/phase4_summary.md de biet chi tiet + nguon tham khao.")
+    # (posted 04/30, no recorded fix; quote: "Anything above transformers==5
+    # with AutoModelForImageTextToText has seemingly always been broken"). In other words,
+    # PaddleOCR-VL via the transformers/trust_remote_code path currently does not work reliably
+    # on ANY transformers version tried (both before and after 5.0), unrelated to our T4/dtype/prompt.
+    # DECISION: REMOVE PaddleOCR-VL from the zero-shot benchmark (not worth the cost of debugging
+    # an unresolved upstream bug further) - move on to Phase 5 (Qwen-VL, a much more stable
+    # ecosystem, with existing precedent of Unsloth running on T4). The code is kept here for
+    # reference/retry later if PaddlePaddle releases a fix.
+    print("  [SKIPPED] PaddleOCR-VL removed from the benchmark due to an upstream compatibility "
+          "bug (transformers/trust_remote_code) with no fix yet - see the code comment and "
+          "results/phase4_summary.md for details and references.")
     return
 
-    # --- Code goc, giu lai de thu lai neu PaddlePaddle fix trong tuong lai ---
+    # --- Original code, kept in case we want to retry if PaddlePaddle fixes this in the future ---
     _pip_install("transformers==4.57.0", "accelerate")
     import torch
     from PIL import Image
@@ -665,7 +677,7 @@ def phase4_paddleocr_vl():
             )[0]
             return text.strip()
 
-        print("\n--- Debug: 5 vi du dau PaddleOCR-VL tren rx_test ---")
+        print("\n--- Debug: first 5 examples of PaddleOCR-VL on rx_test ---")
         debug_preds = []
         for i in range(min(5, len(rx_test))):
             row = rx_test.iloc[i]
@@ -675,22 +687,23 @@ def phase4_paddleocr_vl():
 
         _assert_sane_debug_output("PaddleOCR-VL", debug_preds)
 
-        print("\n--- PaddleOCR-VL tren Kaggle-Rx (Testing, toan bo) ---")
+        print("\n--- PaddleOCR-VL on Kaggle-Rx (Testing, full set) ---")
         run_model_on_manifest("paddleocr-vl", pvl_predict, rx_test, "kaggle_rx")
-        print("\n--- PaddleOCR-VL tren IAM (subsample 400) ---")
+        print("\n--- PaddleOCR-VL on IAM (subsample of 400) ---")
         run_model_on_manifest("paddleocr-vl", pvl_predict, iam_sub, "iam")
     except Exception as e:
-        print(f"  [LOI PaddleOCR-VL, bo qua model nay]: {e}")
+        print(f"  [PaddleOCR-VL ERROR, skipping this model]: {e}")
         traceback.print_exc()
 
 
 # ============================================================
-# PHASE 5 — Qwen2.5-VL-3B-Instruct (VLM tong quat, doi chung voi cac model OCR chuyen biet)
+# PHASE 5 — Qwen2.5-VL-3B-Instruct (a general-purpose VLM, as a control against the specialized OCR models)
 # ============================================================
 def phase5_qwen_vl():
-    # Dung ban 3B (khong phai 7B/8B) - fp16 ~6GB, an toan tren T4 16GB cho zero-shot inference
-    # (khong fine-tune nen khong can lo optimizer state). Qwen2.5-VL la first-class model trong
-    # transformers (khong can trust_remote_code) - it rui ro dut gay API hon GOT-OCR2.0/PaddleOCR-VL.
+    # Using the 3B version (not 7B/8B) - fp16 is ~6GB, safe on a 16GB T4 for zero-shot inference
+    # (no fine-tuning, so no need to worry about optimizer state). Qwen2.5-VL is a first-class
+    # model in transformers (no trust_remote_code needed) - lower risk of API breakage than
+    # GOT-OCR2.0/PaddleOCR-VL.
     _pip_install("transformers==4.57.0", "accelerate", "qwen-vl-utils")
     import torch
     from PIL import Image
@@ -725,7 +738,7 @@ def phase5_qwen_vl():
             trimmed = generated_ids[:, inputs["input_ids"].shape[1]:]
             return qwen_processor.batch_decode(trimmed, skip_special_tokens=True)[0].strip()
 
-        print("\n--- Debug: 5 vi du dau Qwen2.5-VL-3B tren rx_test ---")
+        print("\n--- Debug: first 5 examples of Qwen2.5-VL-3B on rx_test ---")
         debug_preds = []
         for i in range(min(5, len(rx_test))):
             row = rx_test.iloc[i]
@@ -733,46 +746,48 @@ def phase5_qwen_vl():
             debug_preds.append(pred)
             print(f"  ref={row['label']!r}  pred={pred!r}")
 
-        _assert_sane_debug_output("Qwen2.5-VL-3B", debug_preds, max_avg_len=100)  # VLM tong quat co the dai dong hon 1 tu
+        _assert_sane_debug_output("Qwen2.5-VL-3B", debug_preds, max_avg_len=100)  # a general-purpose VLM might produce output longer than a single word
 
-        print("\n--- Qwen2.5-VL-3B tren Kaggle-Rx (Testing, toan bo) ---")
+        print("\n--- Qwen2.5-VL-3B on Kaggle-Rx (Testing, full set) ---")
         run_model_on_manifest("qwen2.5-vl-3b", qwen_predict, rx_test, "kaggle_rx")
-        print("\n--- Qwen2.5-VL-3B tren IAM (subsample 400) ---")
+        print("\n--- Qwen2.5-VL-3B on IAM (subsample of 400) ---")
         run_model_on_manifest("qwen2.5-vl-3b", qwen_predict, iam_sub, "iam")
     except Exception as e:
-        print(f"  [LOI Qwen2.5-VL, bo qua model nay]: {e}")
+        print(f"  [Qwen2.5-VL ERROR, skipping this model]: {e}")
         traceback.print_exc()
 
 
 # ============================================================
-# PHASE 6 — LoRA fine-tune TrOCR-large-handwritten (dong gop phuong phap chinh cho Q2)
+# PHASE 6 — LoRA fine-tuning of TrOCR-large-handwritten (the main methodological contribution for Q2)
 #
-# Da xac nhan (Phase 6 chuan bi, 16/09/2026): Training=3120 anh, Validation=780 anh, Testing=780
-# anh (KHONG phai 2808/936/936 nhu gia dinh ban dau tu mo ta "60/20/20" tren Kaggle - xem
-# results/phase6_summary.md). Test set da "dong bang" ve mat khai niem: build_manifest_kaggle_rx
-# ("Testing") va build_manifest_iam(n_sample=400, seed=42) da xac nhan tra ve CHINH XAC cung
-# 780/400 anh o ca 7 lan chay model truoc (Phase 1-5) - nen KHONG can file frozen rieng, chi can
-# goi lai dung ham nay voi cung seed la tai tao dung tap test cu.
+# Confirmed (Phase 6 prep, 2026-09-16): Training=3120 images, Validation=780 images, Testing=780
+# images (NOT 2808/936/936 as originally assumed from the "60/20/20" description on Kaggle - see
+# results/phase6_summary.md). The test set is conceptually "frozen": build_manifest_kaggle_rx
+# ("Testing") and build_manifest_iam(n_sample=400, seed=42) have been confirmed to return
+# EXACTLY the same 780/400 images across all 7 previous model runs (Phase 1-5) - so no separate
+# frozen file is needed; simply calling this function again with the same seed reproduces the
+# same test set.
 # ============================================================
 def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="trocr-lora-finetuned"):
     print(f"\n=== phase6_finetune_trocr: lora_r={lora_r}, lora_alpha={lora_alpha}, "
           f"use_elastic={use_elastic}, run_name={run_name!r} ===")
-    output_subdir = run_name.replace("trocr-lora-finetuned", "trocr-lora")  # giu duong dan cu cho cau hinh "main"
-    # torchao>=0.16.0 bat buoc: Kaggle base image co san torchao==0.10.0 (cu), peft moi nhat
-    # tu choi chay voi ban cu (kernel v14: ImportError). Ep nang cap torchao cung luc.
+    output_subdir = run_name.replace("trocr-lora-finetuned", "trocr-lora")  # keeps the old path for the "main" configuration
+    # torchao>=0.16.0 is required: the Kaggle base image ships with torchao==0.10.0 (old), and
+    # the latest peft refuses to run with the old version (kernel v14: ImportError). Force the
+    # torchao upgrade at the same time.
     _pip_install("transformers==4.57.0", "accelerate", "peft", "torchao>=0.16.0",
                  "albumentations", "opencv-python-headless")
     import torch
     from PIL import Image
     import albumentations as A
-    import cv2  # noqa: F401 (can cho albumentations doc anh/border mode)
+    import cv2  # noqa: F401 (needed for albumentations to read images/handle border mode)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"  device = {device}")
     if device != "cuda":
-        print("  [CANH BAO] Khong co GPU - fine-tune se rat cham/khong kha thi, nhung van thu.")
+        print("  [WARNING] No GPU available - fine-tuning will be very slow/possibly infeasible, but will still attempt it.")
 
-    # --- Ban sao dong bo cua src/augmentation.py (ly do giu 2 ban: xem src/metrics.py) ---
+    # --- A synced copy of src/augmentation.py (reason for keeping 2 copies: see src/metrics.py) ---
     def build_train_augmentation(elastic=True):
         steps = [
             A.Affine(rotate=(-5, 5), shear=(-8, 8), scale=(0.95, 1.05), p=0.7),
@@ -792,11 +807,11 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         arr = np.array(image.convert("RGB"))
         return Image.fromarray(augmenter(image=arr)["image"])
 
-    # --- Du lieu: Training (train, augmentation) + Validation subsample (theo doi trong luc train) ---
+    # --- Data: Training (train, with augmentation) + Validation subsample (monitored during training) ---
     train_df = build_manifest_kaggle_rx("Training")
     val_df_full = build_manifest_kaggle_rx("Validation")
     val_df = val_df_full.sample(n=min(300, len(val_df_full)), random_state=SEED).reset_index(drop=True)
-    print(f"  train_df={len(train_df)}, val_df_full={len(val_df_full)}, val_df (subsample theo doi)={len(val_df)}")
+    print(f"  train_df={len(train_df)}, val_df_full={len(val_df_full)}, val_df (monitoring subsample)={len(val_df)}")
 
     from transformers import (
         TrOCRProcessor, VisionEncoderDecoderModel, VisionEncoderDecoderConfig,
@@ -804,28 +819,32 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
     )
     from peft import LoraConfig, get_peft_model
 
-    # FIX GOC (kernel v16-v17: 'VisionEncoderDecoderConfig' object has no attribute 'vocab_size',
-    # lap lai o MOI checkpoint save, khong chi lan dau): peft.get_peft_model_state_dict() kiem
-    # tra "co resize embedding khong" bang cach doc model.config.__class__.from_pretrained(id)
-    # .vocab_size tren MOT INSTANCE CONFIG MOI TAI TU DAU moi lan save - dat thuoc tinh instance
-    # (nhu da lam ben duoi) chi fix duoc instance hien tai, khong fix duoc instance moi nay.
-    # Patch THEM property vocab_size vao chinh CLASS VisionEncoderDecoderConfig (delegate sang
-    # decoder.vocab_size) de MOI instance, ke ca instance tai moi trong peft, deu co san.
+    # ROOT-CAUSE FIX (kernel v16-v17: 'VisionEncoderDecoderConfig' object has no attribute
+    # 'vocab_size', recurring on EVERY checkpoint save, not just the first): peft's
+    # get_peft_model_state_dict() checks "does this need embedding resizing" by reading
+    # model.config.__class__.from_pretrained(id).vocab_size on a FRESHLY-LOADED CONFIG INSTANCE
+    # every time it saves — setting the attribute on the instance (as done below) only fixes the
+    # current instance, not this newly-loaded one.
+    # Instead, patch a vocab_size property onto the VisionEncoderDecoderConfig CLASS itself
+    # (delegating to decoder.vocab_size) so that EVERY instance, including ones freshly loaded
+    # inside peft, already has it.
     if not hasattr(VisionEncoderDecoderConfig, "_vocab_size_patched_for_peft"):
         VisionEncoderDecoderConfig.vocab_size = property(lambda self: self.decoder.vocab_size)
         VisionEncoderDecoderConfig._vocab_size_patched_for_peft = True
 
     processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
     base_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
-    # BAT BUOC cho fine-tune VisionEncoderDecoderModel (kernel v15: ValueError khi thieu) -
-    # generate() zero-shot (Phase 2) khong can dong nay vi tu suy ra duoc, nhung training
-    # (shift_tokens_right lam teacher-forcing labels) can config day du. Theo dung convention
-    # chuan cua TrOCR (NielsRogge/Transformers-Tutorials fine-tune notebook, da dan trong ke hoach).
+    # REQUIRED for fine-tuning VisionEncoderDecoderModel (kernel v15: ValueError if missing) -
+    # zero-shot generate() (Phase 2) doesn't need this since it's inferred automatically, but
+    # training (shift_tokens_right for teacher-forcing labels) needs the full config. Following
+    # the standard TrOCR convention (NielsRogge/Transformers-Tutorials fine-tuning notebook,
+    # already cited in the plan).
     base_model.config.decoder_start_token_id = processor.tokenizer.cls_token_id
     base_model.config.pad_token_id = processor.tokenizer.pad_token_id
     base_model.config.eos_token_id = processor.tokenizer.sep_token_id
-    # KHONG gan base_model.config.vocab_size = ... nua - vocab_size gio la property CAP CLASS
-    # (patch o tren), gan truc tiep vao instance se bi AttributeError: can't set attribute.
+    # No longer assigning base_model.config.vocab_size = ... — vocab_size is now a CLASS-level
+    # property (patched above); assigning it directly on the instance would raise AttributeError:
+    # can't set attribute.
     MAX_TARGET_LEN = 32
 
     class RxTorchDataset(torch.utils.data.Dataset):
@@ -851,11 +870,12 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
     def compute_metrics(pred):
         label_ids = pred.label_ids.copy()
         pred_ids = pred.predictions.copy()
-        # Khi cac eval batch sinh chuoi co do dai khac nhau, Trainer noi (concat) predictions
-        # giua cac batch bang cach dem -100 vao cho thieu (torch_pad_and_concatenate) - gia tri
-        # am nay lam tokenizer.decode overflow (OverflowError: out of range integral type
-        # conversion attempted, gap o kernel v19 epoch 10). Phai loc -100 truoc khi decode,
-        # giong nhu da lam voi label_ids ben duoi.
+        # When eval batches generate sequences of different lengths, the Trainer concatenates
+        # predictions across batches by padding the shorter ones with -100
+        # (torch_pad_and_concatenate) — this negative value makes tokenizer.decode overflow
+        # (OverflowError: out of range integral type conversion attempted, hit in kernel v19
+        # epoch 10). Must filter out -100 before decoding, the same way it's already done for
+        # label_ids below.
         pred_ids[pred_ids == -100] = processor.tokenizer.pad_token_id
         pred_str = processor.batch_decode(pred_ids, skip_special_tokens=True)
         label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
@@ -864,8 +884,9 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         return {"cer": float(np.mean(cers))}
 
     class TimeLimitCallback(TrainerCallback):
-        """Phanh an toan: Kaggle session toi da ~9h - dung huan luyen som (khong crash) neu vuot
-        nguong, de con thoi gian cho buoc danh gia frozen-test-set phia sau khong bi mat trang."""
+        """Safety brake: Kaggle sessions max out at ~9h — stop training early (without crashing)
+        if the time limit is exceeded, so there's still time left afterward for the
+        frozen-test-set evaluation step instead of losing the page entirely."""
         def __init__(self, max_seconds):
             self.max_seconds = max_seconds
             self.t0 = time.time()
@@ -873,7 +894,7 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         def on_step_end(self, args, state, control, **kwargs):
             elapsed = time.time() - self.t0
             if elapsed > self.max_seconds:
-                print(f"  [TimeLimitCallback] Vuot {self.max_seconds}s ({elapsed:.0f}s) - DUNG huan luyen som.")
+                print(f"  [TimeLimitCallback] Exceeded {self.max_seconds}s ({elapsed:.0f}s) - STOPPING training early.")
                 control.should_training_stop = True
             return control
 
@@ -883,30 +904,32 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         bias="none", task_type="SEQ_2_SEQ_LM",
     )
     model = get_peft_model(base_model, lora_config).to(device)
-    # Fix loi tuong thich peft<->VisionEncoderDecoderConfig (kernel v16: AttributeError khi
-    # save_pretrained/checkpoint - peft co buoc kiem tra "vocab_size resize" bang cach load lai
-    # AutoConfig.from_pretrained(model_id).vocab_size, nhung VisionEncoderDecoderConfig (kien
-    # truc composite encoder/decoder rieng) khong co thuoc tinh vocab_size o cap top-level nay.
-    # Dat base_model_name_or_path=None de peft BO QUA hoan toan buoc kiem tra nay (an toan vi
-    # ta khong resize embedding).
+    # Fix for a peft<->VisionEncoderDecoderConfig compatibility bug (kernel v16: AttributeError
+    # during save_pretrained/checkpoint — peft has a "vocab_size resize" check step that reloads
+    # AutoConfig.from_pretrained(model_id).vocab_size, but VisionEncoderDecoderConfig (a
+    # composite encoder/decoder architecture) has no top-level vocab_size attribute of its own.
+    # Setting base_model_name_or_path=None makes peft SKIP this check entirely (safe, since we
+    # aren't resizing the embedding).
     for _adapter_name in model.peft_config:
         model.peft_config[_adapter_name].base_model_name_or_path = None
     model.print_trainable_parameters()
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     if n_trainable == 0:
-        # Loi PEFT hay gap: target_modules khong khop ten module thuc te -> 0 tham so LoRA nao
-        # duoc tao, "training" se chay ma khong hoc gi ca. Kiem tra NGAY, KHONG cho chay tiep.
+        # A common PEFT pitfall: target_modules doesn't match the actual module names -> 0 LoRA
+        # parameters get created, and "training" runs without learning anything. Check
+        # IMMEDIATELY, don't let it continue.
         names_sample = [n for n, _ in base_model.named_modules()][:80]
         raise RuntimeError(
-            f"LoRA co 0 tham so trainable - target_modules={lora_config.target_modules} khong "
-            f"khop ten module nao trong model. 80 ten module dau: {names_sample}"
+            f"LoRA has 0 trainable parameters - target_modules={lora_config.target_modules} did "
+            f"not match any module name in the model. First 80 module names: {names_sample}"
         )
 
     # ============================================================
-    # SMOKE TEST truoc (bai hoc Phase 3/4): vai chuc step tren subset nho, kiem tra loss huu han
-    # va giam dan truoc khi cam ket vai gio GPU cho training day du.
+    # SMOKE TEST first (lesson from Phase 3/4): a few dozen steps on a small subset, checking
+    # that the loss is finite and decreasing before committing several hours of GPU time to
+    # full training.
     # ============================================================
-    print("\n--- SMOKE TEST: 20 step tren 64 anh train ---")
+    print("\n--- SMOKE TEST: 20 steps on 64 training images ---")
     smoke_train = RxTorchDataset(train_df.sample(n=min(64, len(train_df)), random_state=SEED),
                                   augmenter=build_train_augmentation(elastic=use_elastic))
     smoke_args = Seq2SeqTrainingArguments(
@@ -919,18 +942,18 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
     smoke_result = smoke_trainer.train()
     smoke_elapsed = time.time() - t0
     loss_hist = [h["loss"] for h in smoke_trainer.state.log_history if "loss" in h]
-    print(f"  Smoke test: {smoke_elapsed:.1f}s / 20 step -> ~{smoke_elapsed/20:.2f}s/step. "
+    print(f"  Smoke test: {smoke_elapsed:.1f}s / 20 steps -> ~{smoke_elapsed/20:.2f}s/step. "
           f"Loss history: {loss_hist}")
     if not loss_hist or not all(np.isfinite(loss_hist)):
-        raise RuntimeError(f"Smoke test: loss khong huu han/rong ({loss_hist}) - DUNG, KHONG chay full training.")
+        raise RuntimeError(f"Smoke test: loss is non-finite/empty ({loss_hist}) - STOPPING, NOT running full training.")
     if len(loss_hist) >= 2 and loss_hist[-1] > loss_hist[0] * 1.5:
-        print(f"  [CANH BAO] Loss tang thay vi giam ({loss_hist[0]:.3f} -> {loss_hist[-1]:.3f}) - "
-              f"co the learning_rate qua cao, nhung van tiep tuc full training (se theo doi eval CER).")
+        print(f"  [WARNING] Loss increased instead of decreasing ({loss_hist[0]:.3f} -> {loss_hist[-1]:.3f}) - "
+              f"learning_rate might be too high, but proceeding with full training anyway (will monitor eval CER).")
     steps_per_epoch = len(train_df) / 16  # effective batch = 8 * grad_accum(2)
-    print(f"  Uoc luong: ~{steps_per_epoch:.0f} step/epoch, ~{steps_per_epoch*smoke_elapsed/20/60:.1f} phut/epoch")
+    print(f"  Estimate: ~{steps_per_epoch:.0f} steps/epoch, ~{steps_per_epoch*smoke_elapsed/20/60:.1f} minutes/epoch")
 
     # ============================================================
-    # TRAINING THAT (sau khi smoke test qua)
+    # ACTUAL TRAINING (after the smoke test passes)
     # ============================================================
     train_ds = RxTorchDataset(train_df, augmenter=build_train_augmentation(elastic=use_elastic))
     val_ds = RxTorchDataset(val_df, augmenter=None)
@@ -962,22 +985,23 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=5), TimeLimitCallback(max_seconds=5 * 3600)],
     )
-    print(f"\n--- TRAINING THAT: LoRA fine-tune TrOCR-large-handwritten "
+    print(f"\n--- ACTUAL TRAINING: LoRA fine-tune TrOCR-large-handwritten "
           f"(r={lora_r}, alpha={lora_alpha}, elastic={use_elastic}) ---")
     t_train0 = time.time()
     trainer.train()
-    print(f"  Training xong sau {time.time() - t_train0:.0f}s. Best eval CER: "
+    print(f"  Training finished after {time.time() - t_train0:.0f}s. Best eval CER: "
           f"{trainer.state.best_metric}")
 
-    # Luu adapter LoRA ngay (truoc khi lam gi khac co the loi) - day la "san pham" quan trong nhat.
+    # Save the LoRA adapter right away (before doing anything else that could fail) - this is the most important "deliverable".
     adapter_dir = f"/kaggle/working/{output_subdir}-adapter"
     model.save_pretrained(adapter_dir)
     processor.save_pretrained(adapter_dir)
-    print(f"  Da luu adapter vao {adapter_dir}")
+    print(f"  Saved adapter to {adapter_dir}")
 
     # ============================================================
-    # DANH GIA TREN CA 2 FROZEN TEST SET (dung LAI CHINH XAC ham build_manifest_* nhu Phase 1-5
-    # - da xac nhan cho cung 780/400 anh moi lan goi, xem docstring Phase 6 o tren).
+    # EVALUATE ON BOTH FROZEN TEST SETS (reusing the EXACT SAME build_manifest_* functions as
+    # Phase 1-5 — confirmed to return the same 780/400 images every call, see the Phase 6
+    # docstring above).
     # ============================================================
     try:
         model.eval()
@@ -986,20 +1010,21 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
         def trocr_lora_predict(path):
             image = Image.open(path).convert("RGB")
             pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
-            # PeftModelForSeq2SeqLM.generate() CHI nhan keyword arg, khong nhan positional
-            # (khac VisionEncoderDecoderModel.generate() goc dung o Phase 2 - kernel v18: TypeError
-            # "takes 1 positional argument but 2 were given" tren CA 1180/1180 anh, hypothesis rong het).
+            # PeftModelForSeq2SeqLM.generate() ONLY accepts keyword args, not positional ones
+            # (unlike the original VisionEncoderDecoderModel.generate() used in Phase 2 - kernel
+            # v18: TypeError "takes 1 positional argument but 2 were given" on ALL 1180/1180
+            # images, leaving every hypothesis empty).
             ids = model.generate(pixel_values=pixel_values, max_new_tokens=MAX_TARGET_LEN)
             return processor.batch_decode(ids, skip_special_tokens=True)[0]
 
         rx_test = build_manifest_kaggle_rx("Testing")
         iam_sub = build_manifest_iam(n_sample=400)
-        print(f"\n--- {run_name} tren Kaggle-Rx (Testing, toan bo, frozen) ---")
+        print(f"\n--- {run_name} on Kaggle-Rx (Testing, full set, frozen) ---")
         run_model_on_manifest(run_name, trocr_lora_predict, rx_test, "kaggle_rx")
-        print(f"\n--- {run_name} tren IAM (subsample 400, frozen) - kiem tra catastrophic forgetting ---")
+        print(f"\n--- {run_name} on IAM (subsample of 400, frozen) - checking for catastrophic forgetting ---")
         run_model_on_manifest(run_name, trocr_lora_predict, iam_sub, "iam")
     except Exception as e:
-        print(f"  [LOI khi danh gia frozen test set, nhung adapter DA duoc luu an toan o tren]: {e}")
+        print(f"  [ERROR while evaluating the frozen test set, but the adapter WAS already saved safely above]: {e}")
         traceback.print_exc()
 
 
@@ -1007,11 +1032,11 @@ def phase6_finetune_trocr(lora_r=16, lora_alpha=32, use_elastic=True, run_name="
 # MAIN
 # ============================================================
 if __name__ == "__main__":
-    phase0_diagnose()  # luon chay truoc de co log cau truc du lieu, du CURRENT_PHASE la gi
+    phase0_diagnose()  # always run first to log the data structure, regardless of CURRENT_PHASE
     if CURRENT_PHASE == 0:
-        print("\n>>> Doc ky output tren. Neu image_col/label_col doan sai (xem dong "
-              "'-> Doan: image_col=...'), sua ham guess_image_and_label_columns() "
-              "hoac gan cung truc tiep, roi chuyen CURRENT_PHASE=1 va chay lai.")
+        print("\n>>> Carefully read the output above. If image_col/label_col was guessed incorrectly "
+              "(see the line '-> Guessed: image_col=...'), fix the guess_image_and_label_columns() "
+              "function or hardcode the correct values, then set CURRENT_PHASE=1 and rerun.")
     elif CURRENT_PHASE == 1:
         phase1_classical_ocr()
     elif CURRENT_PHASE == 2:
@@ -1025,4 +1050,4 @@ if __name__ == "__main__":
     elif CURRENT_PHASE == 6:
         phase6_finetune_trocr(**_ABLATION_PRESETS[ABLATION_CONFIG])
     elif CURRENT_PHASE >= 7:
-        print(f"PHASE {CURRENT_PHASE} chua duoc them vao script nay. Xem docs/05-ke-hoach-Q2.md.")
+        print(f"PHASE {CURRENT_PHASE} has not been added to this script yet. See docs/05-q2-research-plan.md.")

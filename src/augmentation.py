@@ -5,7 +5,7 @@ morphological erosion-dilation). Small-dataset TrOCR fine-tuning on prescription
 independently shown to work by Ali et al. (arXiv:2412.18199, Mask R-CNN + TrOCR on ~1k
 Pakistani prescriptions - NOT an augmentation-methodology paper, cited only as precedent that
 fine-tuning TrOCR at this data scale reaches strong CER) and Aradillas et al. (arXiv:1804.01527,
-ICFHR 2018, transfer learning for small HTR datasets); see docs/05-ke-hoach-Q2.md Section 3.2
+ICFHR 2018, transfer learning for small HTR datasets); see docs/05-q2-research-plan.md Section 3.2
 for the full rationale and citation caveats.
 
 Kept in sync with the copy embedded in notebooks/kaggle_benchmark.py for the actual
@@ -57,8 +57,8 @@ if __name__ == "__main__":
         "data/kaggle_rx/*/Training/training_words/*.png"
     ) or glob.glob("data/kaggle_rx/**/Training/**/*.png", recursive=True)
     if not candidates:
-        print("Khong tim thay anh training cuc bo de test - bo qua self-test hinh anh, "
-              "chi kiem tra pipeline khoi tao duoc khong.")
+        print("No local training images found for testing - skipping the image self-test, "
+              "only checking whether the pipeline initializes correctly.")
         aug_with = build_train_augmentation(elastic=True)
         aug_without = build_train_augmentation(elastic=False)
         dummy = Image.fromarray((np.random.rand(64, 128, 3) * 255).astype("uint8"))
@@ -75,5 +75,5 @@ if __name__ == "__main__":
             augment_pil(img, aug_with, seed=i).save(f"results/augmentation_preview/{i}_elastic.png")
             augment_pil(img, aug_without, seed=i).save(f"results/augmentation_preview/{i}_noelastic.png")
             img.save(f"results/augmentation_preview/{i}_original.png")
-        print(f"Self-test passed: {len(candidates[:5])} anh thuc te da augment, "
-              f"xem results/augmentation_preview/")
+        print(f"Self-test passed: {len(candidates[:5])} real images augmented, "
+              f"see results/augmentation_preview/")

@@ -7,7 +7,7 @@
 **Target venue:** *PeerJ Computer Science* (primary); *Journal of Imaging* and *Health Information Science and Systems* (alternates)
 
 > **Note to self before submission:** confirm real name/affiliation string above, add ORCID if available,
-> and re-verify the two items flagged in `docs/06-tai-lieu-tham-khao-xac-minh.md` §"Việc CẦN làm" (exact
+> and re-verify the two items flagged in `docs/06-verified-references.md` §"To do" (exact
 > Kaggle-Rx dataset statistics from the primary source paper, and whether GOT-OCR2.0/Qwen2.5-VL have since
 > been accepted at a peer-reviewed venue) before final submission.
 
@@ -609,7 +609,7 @@ for every entry to make that conversion mechanical.)*
 9. RxScribe Bench: A Multi-Axis Benchmark for Evaluating Vision-Language Models on Indian Outpatient
    Prescriptions. arXiv:2609.13280. 2026. (author list unconfirmed — verify directly on arXiv before
    submission; read the full paper, not just the abstract, before finalizing the Related Work discussion
-   of it, per `docs/06-tai-lieu-tham-khao-xac-minh.md`.)
+   of it, per `docs/06-verified-references.md`.)
 10. Mia AR, Chowdhury MA, Mamun AA, Ruddra AM, Tanny NT. A Deep Neural Network Approach with Pioneering
     Local Dataset to Recognize Doctor's Handwritten Prescription in Bangladesh. *2024 International
     Conference on Advances in Computing, Communication, Electrical, and Smart Systems (iCACCESS)*.

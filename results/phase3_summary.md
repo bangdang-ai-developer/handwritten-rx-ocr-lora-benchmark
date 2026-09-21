@@ -1,14 +1,14 @@
-# Phase 3 — Kết quả thật (GOT-OCR2.0)
+# Phase 3 — Real results (GOT-OCR2.0)
 
-Chạy trên Kaggle (kernel `dangbang1/ocr-med-benchmark-phase1`, version 11, GPU T4 x2, 16/09/2026, ~32 phút). Cùng 780 ảnh test Kaggle-Rx + 400 ảnh IAM.
+Run on Kaggle (kernel `dangbang1/ocr-med-benchmark-phase1`, version 11, GPU T4 x2, 16/09/2026, ~32 minutes). Same 780 Kaggle-Rx test images + 400 IAM images.
 
-## Sự cố kỹ thuật đã xử lý (quan trọng, ảnh hưởng độ tin cậy số liệu)
+## Technical issue resolved (important — affects confidence in the numbers)
 
-`pip install transformers` (không ghim version) tự chọn bản **5.0.0** (major version rất mới, phát hành gần đây) — gây ra output hoàn toàn vô nghĩa, hỗn loạn đa ngôn ngữ (CER 55-120!) dù prompt/tensor đầu vào đã xác nhận đúng định dạng. Nguyên nhân: GOT-OCR2.0 được merge vào `transformers` từ 31/01/2025 ([PR #34721](https://github.com/huggingface/transformers/pull/34721)), ổn định trên các bản 4.x nhưng chưa chắc tương thích với bước nhảy major 5.0.0. **Đã sửa bằng cách ghim `transformers==4.57.0`** — debug 5 ảnh đầu cho kết quả hợp lý ngay ("Acek", "Acd", "Ach" cho từ "Aceta"), full run cho CER hợp lý (~0.38-0.48). Bài học áp dụng cho Phase 4-5 (PaddleOCR-VL, Qwen-VL): luôn ghim version `transformers`/thư viện liên quan và chạy debug 5 ảnh + có cơ chế tự-dừng-sớm trước khi chạy full 1180 ảnh.
+`pip install transformers` (without pinning a version) auto-selected version **5.0.0** (a very recently released major version) — which produced completely nonsensical, multilingual-garbled output (CER 55-120!) even though the prompt/input tensors were confirmed to be correctly formatted. Root cause: GOT-OCR2.0 was merged into `transformers` on 31/01/2025 ([PR #34721](https://github.com/huggingface/transformers/pull/34721)), stable on the 4.x releases but apparently not yet compatible with the 5.0.0 major-version jump. **Fixed by pinning `transformers==4.57.0`** — debugging on the first 5 images immediately gave sensible results ("Acek", "Acd", "Ach" for the word "Aceta"), and the full run produced a reasonable CER (~0.38-0.48). Lesson applied to Phases 4-5 (PaddleOCR-VL, Qwen-VL): always pin the `transformers`/related-library version and run a 5-image debug pass with an early-stop mechanism before running the full 1180-image set.
 
-## Bảng tổng hợp đầy đủ (4 phase, 6 model)
+## Full summary table (4 phases, 6 models)
 
-| Model | Dataset | n | CER | WER | Exact-match | Top-1 acc (78 lớp) | Degenerate |
+| Model | Dataset | n | CER | WER | Exact-match | Top-1 acc (78 classes) | Degenerate |
 |---|---|---|---|---|---|---|---|
 | **got-ocr2.0** | **kaggle_rx** | 780 | **0.479** | 1.238 | **15.8%** | 67.2% | 0.0% |
 | easyocr | kaggle_rx | 780 | 0.552 | 1.117 | 10.4% | 54.9% | 3.3% |
@@ -21,12 +21,12 @@ Chạy trên Kaggle (kernel `dangbang1/ocr-med-benchmark-phase1`, version 11, GP
 | tesseract | iam | 400 | 0.836 | 1.248 | 6.3% | – | 1.8% |
 | donut-base-synthdog (raw/padded) | iam | 400 | 1.00 / 1.06 | – | 0.0% | – | ~96-100% |
 
-## Nhận định
+## Observations
 
-1. **GOT-OCR2.0 là model tốt nhất tính đến Phase 3** trên CẢ 2 dataset — đúng như kỳ vọng cho một VLM-OCR chuyên biệt thế hệ mới ("OCR-2.0"), vượt cả TrOCR (vốn có lợi thế "sân nhà" trên IAM) và các engine cổ điển.
-2. Trên đơn thuốc, GOT-OCR2.0 dẫn đầu cả CER và exact-match, nhưng TrOCR vẫn có Top-1 classification accuracy cao nhất (79.5%) — khẳng định lại nhận định Phase 2: các metric khác nhau kể câu chuyện khác nhau, cần báo cáo đầy đủ cả 2 loại trong bài báo.
-3. Donut-base (cả 2 cách) vẫn là ngoại lệ thất bại rõ ràng, đã xác nhận là phát hiện hợp lệ (Phase 2 summary) — càng nổi bật khi đối chiếu với GOT-OCR2.0 (cũng là kiến trúc "OCR-free"/VLM nhưng có task-tuning phù hợp) thành công vượt trội. Đây là điểm đối lập tốt cho Discussion: không phải mọi kiến trúc VLM-OCR đều như nhau, sự khác biệt về pretraining/task-alignment quan trọng hơn kiến trúc.
+1. **GOT-OCR2.0 is the best model so far as of Phase 3** on BOTH datasets — as expected for a next-generation specialized VLM-OCR model ("OCR-2.0"), surpassing both TrOCR (which had a "home-field" advantage on IAM) and the classical engines.
+2. On prescriptions, GOT-OCR2.0 leads on both CER and exact-match, but TrOCR still has the highest Top-1 classification accuracy (79.5%) — reaffirming the Phase 2 observation: different metrics tell different stories, and both need to be reported fully in the paper.
+3. Donut-base (both variants) remains a clear failure outlier, already confirmed as a valid finding (Phase 2 summary) — and it stands out even more when contrasted with GOT-OCR2.0 (also an "OCR-free"/VLM architecture, but with appropriate task-tuning) succeeding dramatically. This is a good contrast for the Discussion: not every VLM-OCR architecture is equal — pretraining/task-alignment matters more than architecture alone.
 
-## File dữ liệu
+## Data files
 - `results_master_phase3_got_ocr2.csv`
-- `results_master_combined.csv` (gộp Phase 1+2+2b+3, 7080 dòng — dùng cho phân tích thống kê/viết bài)
+- `results_master_combined.csv` (Phase 1+2+2b+3 combined, 7080 rows — used for statistical analysis/writing)

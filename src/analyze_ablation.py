@@ -16,9 +16,10 @@ SEED = 0
 N_RESAMPLES = 1000
 
 
-# LUU Y (17/09): sau ablation, r=32 duoc chon lam ket qua chinh (CER tot nhat + it forgetting nhat -
-# xem phase7b_ablation_summary.md Muc 3) - da doi ten trong results_master_combined.csv:
-# "trocr-lora-finetuned" gio la r=32 (chinh); r=16 (cau hinh chinh CU) doi ten thanh "trocr-lora-r16".
+# NOTE (2026-09-17): after the ablation, r=32 was chosen as the main result (best CER +
+# least forgetting - see phase7b_ablation_summary.md Section 3) - renamed in
+# results_master_combined.csv: "trocr-lora-finetuned" is now r=32 (main); r=16 (the OLD
+# main config) was renamed to "trocr-lora-r16".
 RANK_MODELS = {
     "trocr-lora-r8": "r=8",
     "trocr-lora-r16": "r=16",
@@ -48,7 +49,7 @@ def summarize(df, models_dict):
         for dataset in ["kaggle_rx", "iam"]:
             sub = df[(df["model"] == model) & (df["dataset"] == dataset)]
             if len(sub) == 0:
-                print(f"  [CANH BAO] khong co du lieu cho model={model!r} dataset={dataset!r} - bo qua")
+                print(f"  [WARNING] no data for model={model!r} dataset={dataset!r} - skipping")
                 continue
             m, lo, hi = bootstrap_ci(sub["cer"].values)
             rows.append({"model": model, "label": label, "dataset": dataset, "n": len(sub),
@@ -97,7 +98,7 @@ def main():
         ("trocr-lora-r16-noelastic", "trocr-lora-r16", "kaggle_rx"),
         ("trocr-lora-r16-noelastic", "trocr-lora-r16", "iam"),
     ]
-    print("=== Wilcoxon signed-rank (paired, moi cau hinh vs. r=16 elastic=True) ===")
+    print("=== Wilcoxon signed-rank (paired, each configuration vs. r=16 elastic=True) ===")
     wdf = pd.DataFrame([pairwise_wilcoxon(df, a, b, ds) for a, b, ds in pairs])
     print(wdf.to_string(index=False))
     wdf.to_csv("results/phase7b_ablation_wilcoxon.csv", index=False)

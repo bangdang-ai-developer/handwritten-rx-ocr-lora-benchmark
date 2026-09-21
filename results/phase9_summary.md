@@ -1,124 +1,130 @@
-# Phase 9 — Phân tích định lượng tổng hợp (toàn bộ model, zero-shot + fine-tuned)
+# Phase 9 — Aggregate quantitative analysis (all models, zero-shot + fine-tuned)
 
-> **⚠️ Cập nhật (17/09/2026):** Đã chạy lại toàn bộ Phase 9 sau khi ablation (Phase 7b) chọn **r=32** làm
-> cấu hình fine-tune chính thức (thay r=16 ban đầu) — mọi số liệu "trocr-lora-finetuned" dưới đây là **r=32**.
-> Không cần GPU để làm lại (chỉ đổi tên model trong `results_master_combined.csv` rồi chạy lại
-> `src/analyze_aggregate.py`) — kết luận tổng thể không đổi, chỉ các con số cụ thể mạnh hơn.
+> **⚠️ Update (17/09/2026):** The entirety of Phase 9 has been rerun after the ablation (Phase 7b) selected
+> **r=32** as the official fine-tuning configuration (replacing the initial r=16) — every
+> "trocr-lora-finetuned" figure below is **r=32**. No GPU is needed to redo this (only renaming the model in
+> `results_master_combined.csv` and rerunning `src/analyze_aggregate.py`) — the overall conclusions are
+> unchanged, only the specific numbers are stronger.
 
-Script tái lập: `src/analyze_aggregate.py`. Bootstrap CI 95% (1.000 resample, seed=0), Wilcoxon signed-rank
-paired trên đúng từng ảnh (mọi model đều chạy trên cùng manifest, seed=42).
+Script for reproduction: `src/analyze_aggregate.py`. 95% bootstrap CI (1,000 resamples, seed=0), paired
+Wilcoxon signed-rank test on exactly matched images (every model was run on the same manifest, seed=42).
 
-## 1. Bảng tổng hợp đầy đủ — 8 model × 2 dataset
+## 1. Full summary table — 8 models × 2 datasets
 
-### Kaggle-Rx Testing (780 ảnh, in-domain — đơn thuốc), xếp theo CER tăng dần
+### Kaggle-Rx Testing (780 images, in-domain — prescriptions), sorted by ascending CER
 
-| Model | CER (95% CI) | WER | Exact-match | Degenerate | Top-1 acc (78 lớp) |
+| Model | CER (95% CI) | WER | Exact-match | Degenerate | Top-1 acc (78 classes) |
 |---|---|---|---|---|---|
-| **trocr-lora-finetuned (r=32)** | **0,114 [0,100–0,130]** | 0,319 | **68,1%** | 0,0% | **92,4%** |
-| qwen2.5-vl-3b | 0,434 [0,372–0,501] | 0,912 | 28,2% | 0,0% | 81,5% |
-| got-ocr2.0 | 0,479 [0,446–0,513] | 1,238 | 15,8% | 0,0% | 67,2% |
-| easyocr | 0,552 [0,529–0,574] | 1,117 | 10,4% | 3,3% | 54,9% |
-| trocr-large-handwritten (zero-shot) | 0,580 [0,555–0,606] | 1,587 | 8,1% | 0,0% | 79,5% |
-| tesseract | 0,625 [0,601–0,648] | 1,304 | 7,3% | 1,4% | 49,2% |
-| donut-base-synthdog | 1,000 [1,000–1,000] | 1,000 | 0,0% | 100,0% | 1,3% |
-| donut-base-synthdog-padded | 4,201 [3,310–5,171] | 1,580 | 1,3% | 77,8% | 3,6% |
+| **trocr-lora-finetuned (r=32)** | **0.114 [0.100–0.130]** | 0.319 | **68.1%** | 0.0% | **92.4%** |
+| qwen2.5-vl-3b | 0.434 [0.372–0.501] | 0.912 | 28.2% | 0.0% | 81.5% |
+| got-ocr2.0 | 0.479 [0.446–0.513] | 1.238 | 15.8% | 0.0% | 67.2% |
+| easyocr | 0.552 [0.529–0.574] | 1.117 | 10.4% | 3.3% | 54.9% |
+| trocr-large-handwritten (zero-shot) | 0.580 [0.555–0.606] | 1.587 | 8.1% | 0.0% | 79.5% |
+| tesseract | 0.625 [0.601–0.648] | 1.304 | 7.3% | 1.4% | 49.2% |
+| donut-base-synthdog | 1.000 [1.000–1.000] | 1.000 | 0.0% | 100.0% | 1.3% |
+| donut-base-synthdog-padded | 4.201 [3.310–5.171] | 1.580 | 1.3% | 77.8% | 3.6% |
 
-### IAM (400 ảnh, out-of-domain — chữ viết tay tổng quát), xếp theo CER tăng dần
+### IAM (400 images, out-of-domain — general handwriting), sorted by ascending CER
 
 | Model | CER (95% CI) | WER | Exact-match | Degenerate |
 |---|---|---|---|---|
-| got-ocr2.0 | 0,386 [0,275–0,581] | 0,518 | 53,8% | 0,3% |
-| trocr-large-handwritten (zero-shot) | 0,441 [0,364–0,515] | 0,570 | 57,3% | 0,0% |
-| **trocr-lora-finetuned (r=32)** | **0,501 [0,453–0,552]** | 0,733 | 26,8% | 0,0% |
-| easyocr | 0,736 [0,703–0,766] | 1,105 | 4,8% | 33,3% |
-| tesseract | 0,836 [0,787–0,886] | 1,248 | 6,3% | 1,8% |
-| donut-base-synthdog | 1,000 [1,000–1,000] | 1,000 | 0,0% | 99,8% |
-| donut-base-synthdog-padded | 1,058 [0,993–1,184] | 0,998 | 0,3% | 96,5% |
-| qwen2.5-vl-3b | 1,100 [0,471–1,960] | 0,613 | 59,3% | 3,5% |
+| got-ocr2.0 | 0.386 [0.275–0.581] | 0.518 | 53.8% | 0.3% |
+| trocr-large-handwritten (zero-shot) | 0.441 [0.364–0.515] | 0.570 | 57.3% | 0.0% |
+| **trocr-lora-finetuned (r=32)** | **0.501 [0.453–0.552]** | 0.733 | 26.8% | 0.0% |
+| easyocr | 0.736 [0.703–0.766] | 1.105 | 4.8% | 33.3% |
+| tesseract | 0.836 [0.787–0.886] | 1.248 | 6.3% | 1.8% |
+| donut-base-synthdog | 1.000 [1.000–1.000] | 1.000 | 0.0% | 99.8% |
+| donut-base-synthdog-padded | 1.058 [0.993–1.184] | 0.998 | 0.3% | 96.5% |
+| qwen2.5-vl-3b | 1.100 [0.471–1.960] | 0.613 | 59.3% | 3.5% |
 
-*(3 cấu hình ablation — r=8, r=16, r=16-không-elastic — không đưa vào bảng chính này để giữ so sánh
-"model chuyên biệt vs VLM tổng quát" gọn; xem đầy đủ ở `results/phase7b_ablation_summary.md`.)*
+*(The 3 ablation configurations — r=8, r=16, r=16-without-elastic — are not included in this main table to
+keep the "specialized model vs. general-purpose VLM" comparison clean; see the full set in
+`results/phase7b_ablation_summary.md`.)*
 
-## 2. Phát hiện đầu tiên (headline): fine-tuned TrOCR vượt qua MỌI model zero-shot trên domain mục tiêu
+## 2. First (headline) finding: fine-tuned TrOCR surpasses EVERY zero-shot model on the target domain
 
-Ở Phase 5, model tốt nhất zero-shot trên kaggle_rx là **Qwen2.5-VL-3B** (CER 0,434), vượt qua cả GOT-OCR2.0.
-Sau khi fine-tune LoRA (r=32), **TrOCR-large-handwritten (558M) vượt qua Qwen2.5-VL-3B (3B, gấp ~5,4 lần
-tham số) với khoảng cách còn LỚN HƠN so với kết quả r=16 trước đây**:
+In Phase 5, the best zero-shot model on kaggle_rx was **Qwen2.5-VL-3B** (CER 0.434), surpassing even
+GOT-OCR2.0. After LoRA fine-tuning (r=32), **TrOCR-large-handwritten (558M) surpasses Qwen2.5-VL-3B (3B,
+~5.4x the parameter count) by an even LARGER margin than the previous r=16 result**:
 
-| So sánh (paired, kaggle_rx) | CER model A | CER model B | Wilcoxon p |
+| Comparison (paired, kaggle_rx) | CER model A | CER model B | Wilcoxon p |
 |---|---|---|---|
-| trocr-lora-finetuned (r=32) vs qwen2.5-vl-3b | 0,114 | 0,434 | **p = 4,43×10⁻⁵⁹** |
-| trocr-lora-finetuned (r=32) vs got-ocr2.0 | 0,114 | 0,479 | **p = 8,00×10⁻⁹³** |
+| trocr-lora-finetuned (r=32) vs qwen2.5-vl-3b | 0.114 | 0.434 | **p = 4.43×10⁻⁵⁹** |
+| trocr-lora-finetuned (r=32) vs got-ocr2.0 | 0.114 | 0.479 | **p = 8.00×10⁻⁹³** |
 
-Cả hai đều cực kỳ có ý nghĩa thống kê — bằng chứng mạnh nhất cho luận điểm trung tâm bài báo: **một model
-chuyên biệt nhỏ, fine-tune nhẹ (LoRA r=32, ~1-2% tham số cập nhật) trên phần cứng miễn phí (Kaggle T4) có
-thể vượt qua VLM tổng quát lớn hơn nhiều trên domain mục tiêu**.
+Both are extremely statistically significant — the strongest evidence for the paper's central claim: **a
+small specialized model, lightly fine-tuned (LoRA r=32, ~1-2% of parameters updated) on free hardware
+(Kaggle T4) can surpass a much larger general-purpose VLM on the target domain**.
 
-## 3. Domain-shift gap (CER trên IAM trừ CER trên kaggle_rx) — mọi model, xếp tăng dần
+## 3. Domain-shift gap (CER on IAM minus CER on kaggle_rx) — all models, sorted ascending
 
 | Model | CER kaggle_rx | CER iam | Gap (iam − kaggle_rx) |
 |---|---|---|---|
-| donut-base-synthdog-padded | 4,201 | 1,058 | −3,143 |
-| trocr-large-handwritten (zero-shot) | 0,580 | 0,441 | −0,139 |
-| got-ocr2.0 | 0,479 | 0,386 | −0,093 |
-| donut-base-synthdog | 1,000 | 1,000 | 0,000 |
-| easyocr | 0,552 | 0,736 | +0,184 |
-| tesseract | 0,625 | 0,836 | +0,211 |
-| **trocr-lora-finetuned (r=32)** | 0,114 | 0,501 | **+0,387** |
-| qwen2.5-vl-3b | 0,434 | 1,100 | +0,667 (xem lưu ý Mục 4) |
+| donut-base-synthdog-padded | 4.201 | 1.058 | −3.143 |
+| trocr-large-handwritten (zero-shot) | 0.580 | 0.441 | −0.139 |
+| got-ocr2.0 | 0.479 | 0.386 | −0.093 |
+| donut-base-synthdog | 1.000 | 1.000 | 0.000 |
+| easyocr | 0.552 | 0.736 | +0.184 |
+| tesseract | 0.625 | 0.836 | +0.211 |
+| **trocr-lora-finetuned (r=32)** | 0.114 | 0.501 | **+0.387** |
+| qwen2.5-vl-3b | 0.434 | 1.100 | +0.667 (see the note in Section 4) |
 
-**Diễn giải không đổi so với r=16**: các model zero-shot chuyên OCR/HTR (TrOCR zero-shot, GOT-OCR2.0) làm
-tốt hơn một chút trên IAM so với kaggle_rx (gap âm). Sau fine-tune, gap của TrOCR đảo chiều mạnh (từ −0,139
-thành +0,387) — bằng chứng số hoá cho đặc biệt-hoá đánh đổi lấy tổng quát-hoá.
+**Interpretation unchanged from r=16**: the zero-shot models specialized for OCR/HTR (zero-shot TrOCR,
+GOT-OCR2.0) perform slightly better on IAM than on kaggle_rx (negative gap). After fine-tuning, TrOCR's gap
+reverses sharply (from −0.139 to +0.387) — quantitative evidence for specialization traded off against
+generalization.
 
-**Lưu ý (tránh nhầm lẫn với Mục 4/`phase7_summary.md`)**: gap tuyệt đối của r=32 (+0,387) thực ra **nhích cao
-hơn** gap của r=16 (+0,376) — vì r=32 cải thiện kaggle_rx (CER giảm từ 0,149→0,114) MẠNH HƠN mức cải thiện
-trên IAM. Điều này KHÔNG mâu thuẫn với kết luận "r=32 tốt hơn r=16 trên cả 2 tiêu chí" ở `phase7_summary.md`
-— r=32 có CER TUYỆT ĐỐI thấp hơn r=16 trên CẢ 2 dataset riêng lẻ (0,114<0,149 và 0,501<0,524), chỉ là *hiệu
-số* giữa 2 dataset (gap) hơi lớn hơn vì mẫu số 2 phía cải thiện không đều nhau. Hai cách đọc số liệu (CER
-tuyệt đối vs. gap tương đối) đo 2 câu hỏi khác nhau — bài báo nên ưu tiên báo cáo CER tuyệt đối từng dataset
-(Mục 1) làm kết luận chính, dùng gap chỉ để minh hoạ xu hướng "đặc biệt hoá" chứ không dùng để so sánh giữa
-các rank.
+**Note (to avoid confusion with Section 4/`phase7_summary.md`)**: the absolute gap for r=32 (+0.387) is
+actually **slightly higher** than the gap for r=16 (+0.376) — because r=32 improves kaggle_rx (CER dropping
+from 0.149→0.114) MORE STRONGLY than the improvement on IAM. This does NOT contradict the conclusion that
+"r=32 is better than r=16 on both criteria" in `phase7_summary.md` — r=32 has a lower ABSOLUTE CER than
+r=16 on BOTH datasets individually (0.114<0.149 and 0.501<0.524); it is only the *difference* between the
+two datasets (the gap) that is slightly larger, because the two sides did not improve by the same amount.
+The two ways of reading the numbers (absolute CER vs. relative gap) answer two different questions — the
+paper should prioritize reporting the absolute CER per dataset (Section 1) as the main conclusion, and use
+the gap only to illustrate the "specialization" trend, not to compare between ranks.
 
-## 4. Lưu ý quan trọng về phương pháp: mean CER có thể gây hiểu lầm với phân phối đuôi dài (heavy-tailed)
+## 4. Important methodological note: mean CER can be misleading with heavy-tailed distributions
 
-*(Không đổi so với bản trước — không phụ thuộc vào lựa chọn rank, giữ nguyên các model không liên quan
-LoRA fine-tune.)*
+*(Unchanged from the previous version — independent of the rank choice, unchanged for the non-LoRA models.)*
 
 | Model (IAM) | Mean CER | Median CER |
 |---|---|---|
-| qwen2.5-vl-3b | 1,100 | **0,000** |
-| got-ocr2.0 | 0,386 | **0,000** |
-| trocr-large-handwritten (zero-shot) | 0,441 | **0,000** |
-| trocr-lora-finetuned (r=32) | 0,501 | **0,400** |
+| qwen2.5-vl-3b | 1.100 | **0.000** |
+| got-ocr2.0 | 0.386 | **0.000** |
+| trocr-large-handwritten (zero-shot) | 0.441 | **0.000** |
+| trocr-lora-finetuned (r=32) | 0.501 | **0.400** |
 
-Ba model zero-shot có **median = 0** trên IAM — đa số ảnh nhận dạng hoàn hảo, mean bị kéo lệch bởi đuôi
-phân phối dài (đặc biệt Qwen2.5-VL). Wilcoxon giữa Qwen2.5-VL và GOT-OCR2.0 trên IAM: **p = 0,330 — KHÔNG có
-ý nghĩa** dù chênh mean trông rất lớn (1,10 vs 0,39) — không thể khẳng định GOT-OCR2.0 "tốt hơn" chỉ dựa
-vào mean.
+Three zero-shot models have **median = 0** on IAM — the majority of images are recognized perfectly, and
+the mean is skewed by a long tail (especially for Qwen2.5-VL). Wilcoxon between Qwen2.5-VL and GOT-OCR2.0
+on IAM: **p = 0.330 — NOT significant**, even though the difference in means looks very large (1.10 vs.
+0.39) — GOT-OCR2.0 cannot be claimed to be "better" based on the mean alone.
 
-Model **fine-tuned (r=32) có median CER = 0,400** trên IAM (không phải 0, và thực tế **thấp hơn** median
-0,429 của r=16) — suy giảm tổng quát hoá vẫn là hiệu ứng **hệ thống, lan rộng** (không chỉ outlier), nhưng
-**nhẹ hơn một chút** so với r=16 — nhất quán với r=32 có CER mean thấp hơn r=16 trên IAM (0,501 vs 0,524).
+The **fine-tuned (r=32) model has median CER = 0.400** on IAM (not 0, and in fact **lower** than the median
+0.429 for r=16) — the loss of generalization remains a **systematic, widespread** effect (not just
+outliers), but **slightly milder** than for r=16 — consistent with r=32 having a lower mean CER than r=16
+on IAM (0.501 vs. 0.524).
 
-## 5. Toàn bộ số liệu Wilcoxon đã chạy
+## 5. All Wilcoxon tests run
 
-| model_a | model_b | dataset | n | CER a | CER b | p-value | Ý nghĩa (α=0,05) |
+| model_a | model_b | dataset | n | CER a | CER b | p-value | Significant (α=0.05) |
 |---|---|---|---|---|---|---|---|
-| trocr-large-handwritten | trocr-lora-finetuned (r=32) | kaggle_rx | 780 | 0,580 | 0,114 | 6,97×10⁻¹¹¹ | Có ý nghĩa |
-| trocr-large-handwritten | trocr-lora-finetuned (r=32) | iam | 400 | 0,441 | 0,501 | 3,18×10⁻⁴ | Có ý nghĩa |
-| qwen2.5-vl-3b | got-ocr2.0 | kaggle_rx | 780 | 0,434 | 0,479 | 9,57×10⁻²⁵ | Có ý nghĩa |
-| qwen2.5-vl-3b | got-ocr2.0 | iam | 400 | 1,100 | 0,386 | 0,330 | **Không** có ý nghĩa |
-| trocr-lora-finetuned (r=32) | qwen2.5-vl-3b | kaggle_rx | 780 | 0,114 | 0,434 | 4,43×10⁻⁵⁹ | Có ý nghĩa |
-| trocr-lora-finetuned (r=32) | got-ocr2.0 | kaggle_rx | 780 | 0,114 | 0,479 | 8,00×10⁻⁹³ | Có ý nghĩa |
-| trocr-lora-finetuned (r=32) | got-ocr2.0 | iam | 400 | 0,501 | 0,386 | 2,34×10⁻¹³ | Có ý nghĩa |
+| trocr-large-handwritten | trocr-lora-finetuned (r=32) | kaggle_rx | 780 | 0.580 | 0.114 | 6.97×10⁻¹¹¹ | Significant |
+| trocr-large-handwritten | trocr-lora-finetuned (r=32) | iam | 400 | 0.441 | 0.501 | 3.18×10⁻⁴ | Significant |
+| qwen2.5-vl-3b | got-ocr2.0 | kaggle_rx | 780 | 0.434 | 0.479 | 9.57×10⁻²⁵ | Significant |
+| qwen2.5-vl-3b | got-ocr2.0 | iam | 400 | 1.100 | 0.386 | 0.330 | **Not** significant |
+| trocr-lora-finetuned (r=32) | qwen2.5-vl-3b | kaggle_rx | 780 | 0.114 | 0.434 | 4.43×10⁻⁵⁹ | Significant |
+| trocr-lora-finetuned (r=32) | got-ocr2.0 | kaggle_rx | 780 | 0.114 | 0.479 | 8.00×10⁻⁹³ | Significant |
+| trocr-lora-finetuned (r=32) | got-ocr2.0 | iam | 400 | 0.501 | 0.386 | 2.34×10⁻¹³ | Significant |
 
-## 6. Tóm tắt cho phần Kết quả của bài báo
+## 6. Summary for the paper's Results section
 
-1. **Đóng góp chính**: LoRA fine-tune (r=32) TrOCR-large-handwritten (558M) trên 3.120 ảnh giúp nó vượt qua
-   mọi model zero-shot kể cả VLM tổng quát lớn hơn (Qwen2.5-VL-3B, GOT-OCR2.0) trên domain mục tiêu, với ý
-   nghĩa thống kê rất mạnh (p<10⁻⁵⁸ cho mọi so sánh liên quan) — CER giảm 80% so với zero-shot.
-2. **Giới hạn cần nêu trung thực**: cải thiện này đi kèm suy giảm tổng quát hoá có ý nghĩa thống kê (p<0,001)
-   trên chữ viết tay ngoài domain (IAM), tuy nhẹ hơn cấu hình r=16 ban đầu.
-3. **Lưu ý phương pháp cho Discussion**: một số model (đặc biệt VLM tổng quát) có phân phối CER đuôi dài —
-   nên báo cáo median song song với mean.
+1. **Main contribution**: LoRA fine-tuning (r=32) of TrOCR-large-handwritten (558M) on 3,120 images allows
+   it to surpass every zero-shot model, including larger general-purpose VLMs (Qwen2.5-VL-3B, GOT-OCR2.0),
+   on the target domain, with very strong statistical significance (p<10⁻⁵⁸ for every relevant comparison)
+   — an 80% CER reduction relative to zero-shot.
+2. **Limitation that must be stated honestly**: this improvement comes with a statistically significant
+   (p<0.001) loss of generalization on out-of-domain handwriting (IAM), although it is milder than the
+   original r=16 configuration.
+3. **Methodological note for the Discussion**: some models (especially general-purpose VLMs) have
+   heavy-tailed CER distributions — median should be reported alongside mean.

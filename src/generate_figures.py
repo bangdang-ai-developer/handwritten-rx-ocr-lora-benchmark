@@ -201,7 +201,7 @@ def fig7_qualitative_examples():
             if local_path:
                 picks.append(row)
     if not picks:
-        print("  [fig7] KHONG tim thay anh cuc bo phu hop - bo qua fig7.")
+        print("  [fig7] No suitable local images found - skipping fig7.")
         return
 
     n = len(picks)

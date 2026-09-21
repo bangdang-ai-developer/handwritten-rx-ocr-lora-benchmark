@@ -78,13 +78,13 @@ def main():
 
     summary = summary_table(df)
     summary.to_csv("results/phase9_summary_table.csv", index=False)
-    print("=== Bang tong hop moi model x dataset ===")
+    print("=== Summary table for every model x dataset ===")
     print(summary.to_string(index=False))
     print()
 
     gap = domain_gap_table(summary)
     gap.to_csv("results/phase9_domain_gap.csv", index=False)
-    print("=== Domain-shift gap (CER_iam - CER_kaggle_rx), sap xep tang dan ===")
+    print("=== Domain-shift gap (CER_iam - CER_kaggle_rx), sorted ascending ===")
     print(gap.to_string(index=False))
     print()
 
@@ -100,7 +100,7 @@ def main():
     results = [paired_wilcoxon(df, a, b, ds) for a, b, ds in pairs_to_test]
     wdf = pd.DataFrame(results)
     wdf.to_csv("results/phase9_wilcoxon_pairs.csv", index=False)
-    print("=== Wilcoxon signed-rank pairwise (paired tren cung anh) ===")
+    print("=== Wilcoxon signed-rank pairwise (paired on the same images) ===")
     print(wdf.to_string(index=False))
 
 
