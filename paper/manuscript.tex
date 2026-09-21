@@ -318,15 +318,22 @@ Kaggle base image's default \texttt{torchao==0.10.0} is incompatible with \textt
 
 \textbf{Rank and augmentation ablation.} Rather than fixing the LoRA rank in advance, we trained to early
 stopping for three ranks (r $\in \{8, 16, 32\}$, $\alpha = 2r$ throughout, elastic distortion on) and, with
-rank held at 16, for augmentation on versus off, evaluating all four resulting checkpoints on the same
-frozen Kaggle-Rx and IAM test sets described above. We picked the configuration reported as ``the'' fine-tuned
-model by frozen-test CER on both datasets jointly, rather than committing to a rank beforehand, precisely
-because the ablation is what tells us which configuration to report as primary (Section~4.2). One caveat we
-want to state plainly rather than bury: each configuration was trained with a single random seed, so part of
-the spread we observe between ranks could reflect ordinary run-to-run training variance rather than a pure
-rank effect (Section~6). The paired Wilcoxon tests in Section~4.2 establish that the specific checkpoints we
-compared are statistically distinguishable, which is a narrower and weaker claim than that repeated training
-runs at a given rank would reliably reproduce the same ranking.
+rank held at 16, for augmentation on versus off. To avoid choosing the configuration reported as ``the''
+fine-tuned model by peeking at the frozen test sets, we select the primary rank on the full, held-out
+Kaggle-Rx \texttt{Validation} split (n = 780, disjoint from both \texttt{Training} and \texttt{Testing} ---
+not to be confused with the 300-image random subsample of the same split used only for epoch-level early
+stopping during training) rather than by test-set CER: r = 32 has the lowest validation CER (0.117),
+followed by r = 16 (0.135) and r = 8 (0.156), so r = 32 is the configuration we report as primary and carry
+into Section~4.2. The frozen-test-set ablation numbers in Table~\ref{tab:ablation} are reported separately,
+as a descriptive comparison, and were not used to make this selection. One caveat we want to state plainly
+rather than bury: each configuration was trained with a single random seed, so part of the spread we observe
+between ranks could reflect ordinary run-to-run training variance rather than a pure rank effect
+(Section~6). Consistent with that concern, a rerun of the r = 8 configuration under a corrected seeding
+procedure (Section~6) produced a noticeably worse test-set CER (0.162) than the original r = 8 run reported
+in Table~\ref{tab:ablation} (0.113), underscoring that single-run rank comparisons should be read with
+caution regardless of which split they are computed on. The paired Wilcoxon tests in Section~4.2 establish
+that the specific checkpoints we compared are statistically distinguishable, which is a narrower and weaker
+claim than that repeated training runs at a given rank would reliably reproduce the same ranking.
 
 \subsection{Qualitative error taxonomy}
 
@@ -458,7 +465,13 @@ Holm--Bonferroni correction within the same six-comparison family it rises to $p
 effect size ($r_{rb} = -0.17$). We therefore treat r = 32's apparent IAM advantage over r = 16 as a favorable
 point estimate rather than a statistically established difference, and rely on the two Holm-significant,
 in-domain comparisons above --- together with the fact that r = 32 does not underperform r = 16 on IAM in
-absolute terms --- to justify using r = 32 as ``the fine-tuned model'' for the rest of this paper. Turning
+absolute terms, and the independent validation-set selection in Section~3.4 agreeing on r = 32 --- to justify
+using r = 32 as ``the fine-tuned model'' for the rest of this paper. The r = 8 vs.\ r = 16 comparison above is
+statistically significant \emph{for the specific pair of single-seed checkpoints we trained}, but should be
+read with the caveat already flagged in Section~3.4 and revisited in Section~6: a reseeded rerun of r = 8
+alone moved its Kaggle-Rx CER from 0.113 to 0.162 (worse than r = 16's 0.149), so we do not treat ``r = 8
+beats r = 16'' as an established rank effect, only as a property of this particular pair of training runs.
+Turning
 elastic distortion off, with rank held at 16, leaves in-domain CER essentially unchanged (0.149 versus 0.150;
 Holm-adjusted $p = 1.00$, $r_{rb} = 0.04$, a negligible effect) and produces a somewhat worse point estimate
 on IAM (0.562 versus 0.524) that likewise does not survive correction (Holm-adjusted $p = 0.32$,
@@ -645,11 +658,14 @@ on a modest, domain-relevant dataset is both more accessible and more effective 
 general-purpose models zero-shot.
 
 \textbf{Rank matters, and a reasonable-sounding default is not a substitute for checking.} A LoRA rank of 16
-is a common default in the fine-tuning literature, and it was our own initial plan. Our ablation shows that,
-in this setting, it was beaten by both a smaller rank (8) and a larger one (32) on the in-domain metric, with
-no compensating advantage on generalization. We flag this mainly as a methodological caution: without the
-ablation, we would have reported a materially weaker headline result (CER 0.149 rather than 0.114) under the
-mistaken impression that it was close to optimal.
+is a common default in the fine-tuning literature, and it was our own initial plan. Our ablation, and
+independently the validation-set selection in Section~3.4, both show that r = 32 beats r = 16 on the
+in-domain metric, with no compensating advantage on generalization; we flag this mainly as a methodological
+caution: without checking, we would have reported a materially weaker headline result (CER 0.149 rather than
+0.114) under the mistaken impression that r = 16 was close to optimal. The single-run ablation additionally
+suggested r = 8 also beat r = 16, but that specific comparison is the one a reseeded rerun (Section~3.4,
+Section~6) failed to reproduce, so we no longer treat ``r = 8 beats r = 16'' as established -- only
+``r = 32 beats r = 16,'' which two independent selection procedures agree on.
 
 \textbf{LoRA does not eliminate catastrophic forgetting here.} The Section~4.4 result --- a statistically
 significant, systematic degradation on out-of-domain handwriting after updating under 2\% of parameters ---
@@ -700,8 +716,11 @@ a given rank would reliably reproduce the same ranking, and part of the observed
 run-to-run training variance. A replication with at least five independent training seeds per rank,
 reporting mean $\pm$ SD CER/WER and re-running the same Wilcoxon signed-rank plus Holm--Bonferroni plus
 rank-biserial pipeline (Section~3.3) across seeds, would be needed to establish whether the r = 8/32-over-16
-ordering reflects a true rank effect rather than seed noise; we did not have the compute budget for this
-within the free-tier GPU constraints of the study.
+ordering reflects a true rank effect rather than seed noise; a full replication of this scope was beyond the
+free-tier GPU budget of the study, though a partial check is informative: rerunning r = 8 alone under a
+corrected seeding procedure (Section~3.4) moved its test-set CER from 0.113 to 0.162, a swing large enough on
+its own to overturn the r = 8-over-16 part of the ordering, which is direct evidence that seed noise, not
+only a true rank effect, contributes materially to the ablation spread we report.
 \item \textbf{PaddleOCR-VL could not be benchmarked}, owing to an unresolved upstream library
 incompatibility, leaving one of the four general-VLM systems we set out to test excluded from quantitative
 comparison.

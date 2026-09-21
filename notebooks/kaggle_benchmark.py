@@ -64,7 +64,7 @@ CURRENT_PHASE = 6   # 0=diagnostics, 1=classical OCR, 2=TrOCR+Donut, 3=GOT-OCR2.
 # is needed to fix a test-set-leakage issue in how the reported rank (r=32) was originally chosen
 # (see docs/05-q2-research-plan.md and the advisor feedback that prompted this). This rerun at
 # seed=42 doubles as one of the 9 seed x rank data points for the multi-seed replication below.
-ABLATION_CONFIG = "r8"   # "main" | "r8" | "r32" | "r16_noelastic" | "r8_seed123" | ... (see _SEED_SWEEP below)
+ABLATION_CONFIG = "r8_seed123"   # "main" | "r8" | "r32" | "r16_noelastic" | "r8_seed123" | ... (see _SEED_SWEEP below)
 _ABLATION_PRESETS = {
     "main":          dict(lora_r=16, lora_alpha=32, use_elastic=True,  run_name="trocr-lora-finetuned"),
     "r8":            dict(lora_r=8,  lora_alpha=16, use_elastic=True,  run_name="trocr-lora-r8"),
