@@ -326,14 +326,21 @@ stopping during training) rather than by test-set CER: r = 32 has the lowest val
 followed by r = 16 (0.135) and r = 8 (0.156), so r = 32 is the configuration we report as primary and carry
 into Section~4.2. The frozen-test-set ablation numbers in Table~\ref{tab:ablation} are reported separately,
 as a descriptive comparison, and were not used to make this selection. One caveat we want to state plainly
-rather than bury: each configuration was trained with a single random seed, so part of the spread we observe
-between ranks could reflect ordinary run-to-run training variance rather than a pure rank effect
-(Section~6). Consistent with that concern, a rerun of the r = 8 configuration under a corrected seeding
-procedure (Section~6) produced a noticeably worse test-set CER (0.162) than the original r = 8 run reported
-in Table~\ref{tab:ablation} (0.113), underscoring that single-run rank comparisons should be read with
-caution regardless of which split they are computed on. The paired Wilcoxon tests in Section~4.2 establish
-that the specific checkpoints we compared are statistically distinguishable, which is a narrower and weaker
-claim than that repeated training runs at a given rank would reliably reproduce the same ranking.
+rather than bury: each configuration in Table~\ref{tab:ablation} was trained with a single random seed, so
+part of the spread we observe between ranks could reflect ordinary run-to-run training variance rather than
+a pure rank effect. We checked this with a partial replication: two further training runs per rank at seeds
+123 and 2024, under a corrected seeding procedure that fixes a bug where the configured seed value did not
+previously affect LoRA weight initialization (Table~\ref{tab:seedsweep} in Section~4.2 gives the full mean
+$\pm$ SD; Section~6 discusses the implications and important caveats, including that r = 8's third run also
+uses this corrected procedure while r = 16 and r = 32's original runs predate it). The corrected-procedure
+rerun of r = 8 alone, for instance, produced a noticeably worse test-set CER (0.162) than the original r = 8
+run reported in Table~\ref{tab:ablation} (0.113) --- underscoring that single-run rank comparisons should be
+read with caution regardless of which split they are computed on. Across all three runs per rank, r = 32
+keeps the lowest mean CER on both test sets, but the seed-to-seed spread is large enough that we treat this
+as support for r = 32 as the better choice on average rather than as evidence it would win on every
+individual run (Section~6). The paired Wilcoxon tests in Section~4.2 establish
+that the specific checkpoints we originally compared are statistically distinguishable, which is a narrower
+and weaker claim than that repeated training runs at a given rank would reliably reproduce the same ranking.
 
 \subsection{Qualitative error taxonomy}
 
@@ -345,7 +352,8 @@ in other words, the output closely resembles a specific, different real drug nam
 \textbf{hallucination, far off} (wrong, and not close to any real drug name in the vocabulary). The 0.34
 cutoff was picked as a round threshold separating ``clearly reads as a specific other word'' from ``not
 close to anything on the list'' after inspecting the distance distribution by eye; we report it as a design
-choice, not a clinically validated cutoff (Section~6). For IAM, which has no closed vocabulary, we instead
+choice, not a clinically validated cutoff, and verify with a post-hoc sensitivity sweep that the
+confusable-wrong-drug category remains non-negligible across a range of plausible cutoffs (Section~6). For IAM, which has no closed vocabulary, we instead
 bin predictions into correct, minor ($0 < \text{CER} \leq 0.3$), moderate ($0.3 < \text{CER} \leq 0.7$), and
 severe ($\text{CER} > 0.7$) error. We also checked, for the fine-tuned model on IAM only, whether any
 prediction exactly matches one of the 78 Kaggle-Rx drug names while being clearly wrong relative to the true
@@ -477,6 +485,39 @@ Holm-adjusted $p = 1.00$, $r_{rb} = 0.04$, a negligible effect) and produces a s
 on IAM (0.562 versus 0.524) that likewise does not survive correction (Holm-adjusted $p = 0.32$,
 $r_{rb} = 0.15$, a small effect); we kept elastic distortion in the final pipeline because there is no sign
 it hurts, and only a small, statistically unconfirmed hint that it helps retention.
+
+\begin{table}[ht]
+\centering
+\caption{Multi-seed replication: CER, mean $\pm$ SD across three training runs per rank (the original run
+in Table~\ref{tab:ablation}, plus two further runs at seeds 123 and 2024 under the corrected seeding
+procedure of Section~6; for r = 8, whose original checkpoint was not preserved, all three runs use the
+corrected procedure). Elastic augmentation on throughout.}
+\label{tab:seedsweep}
+\small
+\begin{tabular}{lcc}
+\toprule
+Rank & CER, Kaggle-Rx (mean $\pm$ SD) & CER, IAM (mean $\pm$ SD) \\
+\midrule
+r = 8  & 0.159 $\pm$ 0.013 & 0.551 $\pm$ 0.072 \\
+r = 16 & 0.144 $\pm$ 0.015 & 0.536 $\pm$ 0.048 \\
+r = 32 & 0.130 $\pm$ 0.016 & 0.529 $\pm$ 0.029 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Multi-seed replication.} The Kaggle-Rx and IAM single-seed CER values quoted above are also
+summarized, with two further training runs per rank, in Table~\ref{tab:seedsweep} (mean $\pm$ SD across
+three runs; full detail in Section~6). r = 32 keeps the lowest mean CER on both datasets (Kaggle-Rx: 0.130
+$\pm$ 0.016; IAM: 0.529 $\pm$ 0.029), consistent with the independent validation-set selection in
+Section~3.4 --- note this is not the same as saying r = 32 has the lowest single-run test CER in
+Table~\ref{tab:ablation} (r = 8's 0.113 is nominally lower there than r = 32's 0.114), which is exactly the
+kind of single-run noise this replication is meant to average over. The per-rank spread is large relative to
+the gaps between ranks: on Kaggle-Rx, r = 16's mean (0.144 $\pm$ 0.015) and r = 32's mean (0.130 $\pm$ 0.016)
+sit less than one SD apart, and on one of the three runs per rank (seed 123) r = 16 actually beats r = 32
+outright (0.127 versus 0.146); the same reversal appears on IAM at seed 2024 (r = 16: 0.495, r = 32: 0.560).
+We therefore read this replication as supporting r = 32 as the better choice \textit{on average}, not as
+evidence that r = 32 would beat r = 16 on every possible training run --- the same caution already flagged
+for the r = 8 vs.\ r = 16 comparison in Section~3.4 applies here too, just less severely.
 
 Training at r = 32 reaches its best validation CER (0.102 on the 300-image tracking subsample) at epoch~2 of
 15, and early stopping triggers at epoch~7 after five epochs without improvement
@@ -665,7 +706,10 @@ caution: without checking, we would have reported a materially weaker headline r
 0.114) under the mistaken impression that r = 16 was close to optimal. The single-run ablation additionally
 suggested r = 8 also beat r = 16, but that specific comparison is the one a reseeded rerun (Section~3.4,
 Section~6) failed to reproduce, so we no longer treat ``r = 8 beats r = 16'' as established -- only
-``r = 32 beats r = 16,'' which two independent selection procedures agree on.
+``r = 32 beats r = 16,'' which two independent selection procedures agree on, and which a subsequent
+three-run-per-rank replication (Section~6) also supports on average (mean Kaggle-Rx CER 0.130 for r = 32
+versus 0.144 for r = 16), albeit with individual-run variance large enough that r = 16 wins outright on one
+of the three runs.
 
 \textbf{LoRA does not eliminate catastrophic forgetting here.} The Section~4.4 result --- a statistically
 significant, systematic degradation on out-of-domain handwriting after updating under 2\% of parameters ---
@@ -704,23 +748,43 @@ actually is.
 
 \section{Limitations}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/fig10_threshold_sensitivity.png}
+\caption{Sensitivity of the confusable-drug distance threshold: distribution of normalized edit distances
+for wrong, non-degenerate, top-1-incorrect Kaggle-Rx predictions (n = 55), with the 0.34 cutoff used in the
+paper and the data-driven largest-gap candidate ($\approx$0.21) marked.}
+\label{fig:threshold_sensitivity}
+\end{figure}
+
 \begin{itemize}[leftmargin=*]
 \item \textbf{One training dataset per domain.} We use a single public prescription dataset, with its own
 particular 78-drug vocabulary and handwriting population, and a single general-handwriting control (IAM).
 Results may not carry over to prescription handwriting in other languages, health systems, or drug-name
 vocabularies.
-\item \textbf{One random seed per fine-tuning configuration.} Each of the four ablation configurations
-(Sections~3.4, 4.2) was trained exactly once. The paired Wilcoxon tests tell us the specific trained
-checkpoints differ significantly on the frozen test sets; they do not tell us that repeated training runs at
-a given rank would reliably reproduce the same ranking, and part of the observed rank effect could be
-run-to-run training variance. A replication with at least five independent training seeds per rank,
-reporting mean $\pm$ SD CER/WER and re-running the same Wilcoxon signed-rank plus Holm--Bonferroni plus
-rank-biserial pipeline (Section~3.3) across seeds, would be needed to establish whether the r = 8/32-over-16
-ordering reflects a true rank effect rather than seed noise; a full replication of this scope was beyond the
-free-tier GPU budget of the study, though a partial check is informative: rerunning r = 8 alone under a
-corrected seeding procedure (Section~3.4) moved its test-set CER from 0.113 to 0.162, a swing large enough on
-its own to overturn the r = 8-over-16 part of the ordering, which is direct evidence that seed noise, not
-only a true rank effect, contributes materially to the ablation spread we report.
+\item \textbf{A partial, three-seed replication, not the five-seed design we judge would be needed.}
+Each of the four original ablation configurations (Sections~3.4, 4.2) was trained exactly once. The paired
+Wilcoxon tests tell us the specific trained checkpoints differ significantly on the frozen test sets; they do
+not tell us that repeated training runs at a given rank would reliably reproduce the same ranking, and part
+of the observed rank effect could be run-to-run training variance. We partially addressed this for the three
+ranks (8, 16, 32; the augmentation-off r = 16 configuration remains single-seed): for each rank we now have
+three training runs --- the original run in Table~\ref{tab:ablation}, plus two further runs at seeds 123 and
+2024 under a corrected seeding procedure that fixes a bug where the configured seed value did not previously
+affect LoRA weight initialization. (For r = 8, whose original checkpoint was not preserved on disk, all
+three runs use the corrected procedure, i.e.\ three genuinely controlled seeds; for r = 16 and r = 32, the
+first run predates the fix, so it reflects whatever uncontrolled randomness affected LoRA initialization at
+the time rather than a deliberately chosen seed, and is included as the best available third data point, not
+as a methodologically clean seed.) Table~\ref{tab:seedsweep} (Section~4.2) reports the resulting mean $\pm$
+SD: r = 32 keeps the lowest mean CER on both Kaggle-Rx (0.130 $\pm$ 0.016) and IAM (0.529 $\pm$ 0.029),
+consistent with the validation-set selection, but the spread across runs is large enough that r = 16 wins
+outright on one of the three runs on both datasets (Kaggle-Rx CER 0.127 versus r = 32's 0.146 at seed 123;
+IAM 0.495 versus 0.560 at seed 2024). We therefore continue to treat ``r = 32 beats r = 16'' as favored on
+average rather than decisively established per-run, and, as already noted in Sections~4.2 and~5, no longer
+treat ``r = 8 beats r = 16'' as established at all: one of r = 8's own three runs (seed 2024, CER 0.146)
+already beats the original single-run r = 16 result (0.149) reported in Table~\ref{tab:ablation}. A full
+replication with five seeds per rank and the same Wilcoxon/Holm--Bonferroni/rank-biserial pipeline
+(Section~3.3) re-run across seeds, which we judge would be needed to formally establish rather than merely
+support a rank ordering, remained beyond the free-tier GPU budget of this study.
 \item \textbf{PaddleOCR-VL could not be benchmarked}, owing to an unresolved upstream library
 incompatibility, leaving one of the four general-VLM systems we set out to test excluded from quantitative
 comparison.
@@ -728,9 +792,21 @@ comparison.
 label space mean some of the fine-tuned model's strong in-domain performance is attributable to a genuinely
 narrow task. We do not evaluate performance on drug names outside this 78-class vocabulary, or on
 dosage/frequency text beyond the drug name itself.
-\item \textbf{The 0.34 confusable-drug distance threshold (Section~3.5) is a design choice, not a
-clinically validated cutoff.} We report it transparently; a formal LASA-pair-based definition, following
-Karet \citep{Karet2023TallMan}, would be a natural refinement.
+\item \textbf{The 0.34 confusable-drug distance threshold (Section~3.5) is a reasonable choice within a
+range that supports our conclusion, not a uniquely optimal or clinically validated cutoff.} We swept
+candidate thresholds from 0.20 to 0.50 against the 55 wrong, non-degenerate, top-1-incorrect Kaggle-Rx
+predictions the split applies to (Figure~\ref{fig:threshold_sensitivity}). A purely data-driven
+largest-gap heuristic, searched over the wider distance range [0.15, 0.55], points to $\approx$0.21 rather
+than 0.34, so we do not claim 0.34 sits at a clean natural break in the distance distribution. What the
+sweep does show is that the fine-tuned model's confusable-wrong-drug category stays non-negligible across
+the whole plausible range: its share of all 780 Kaggle-Rx predictions runs from 1.9\% (at 0.20) to 5.5\% (at
+0.50), never disappearing, though the specific point estimate we report (2.6\% at 0.34,
+Table~\ref{tab:errortax}) is one value within that range rather than a uniquely determined one; we did not
+re-run the equivalent sweep for the zero-shot model, so this check supports the category's existence being
+robust to the exact cutoff, not that the specific zero-shot-versus-fine-tuned shift in
+Table~\ref{tab:errortax} is itself threshold-invariant. We therefore report 0.34 as a transparent, reasonable
+design choice supported by a robustness check, not as a precisely justified cutoff; a formal LASA-pair-based
+definition, following Karet \citep{Karet2023TallMan}, would be a natural refinement.
 \item \textbf{IAM is one particular operationalization of ``general handwriting.''} Generalization loss
 measured against IAM may not represent generalization loss against other out-of-domain distributions:
 other languages, other prescription vocabularies, or clinical free text.
