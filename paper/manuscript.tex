@@ -847,18 +847,18 @@ readers
 should independently check the exact license terms on each dataset's page before redistributing it.
 
 \paragraph{AI-use disclosure.} The author used Claude (Anthropic), accessed via Claude Code,
-throughout this project's development (15--18 September 2026) to assist with drafting and editing manuscript
-prose, writing and reviewing the statistical-analysis code described in Section~3.3
-(\texttt{src/analyze\_\allowbreak statistics.py}), generating the figures in Section~4, and literature
-search and citation triage. Specifically: Claude Sonnet 5 (model ID claude-sonnet-5) produced the majority of
-the code commits, the LaTeX manuscript draft, the statistical-reporting script, and the final editing pass
-reported here (17--18 September 2026); Claude Haiku 4.5 (model ID claude-haiku-4-5-20251001) was
-used for portions of manuscript review and venue-verification research on 18 September 2026. % TODO(author):
-% the earlier development sessions (15--16 September 2026) that produced the benchmark and fine-tuning
-% pipeline predate this project's practice of recording model identity in commit metadata, so the exact
-% Claude model version(s) used in those specific sessions could not be reconstructed from the available
-% record and are omitted here rather than guessed at -- please confirm and add if you recall which model(s)
-% you used in that earlier period, or leave as-is if unconcerned.
+throughout this project's development (15 September--23 September 2026) to assist with running the
+benchmark and fine-tuning pipeline, drafting and editing manuscript prose, writing and reviewing the
+statistical-analysis code described in Section~3.3 (\texttt{src/analyze\_\allowbreak statistics.py}),
+generating the figures in Section~4, and literature search and citation triage. Specifically: Claude Sonnet
+5 (model ID claude-sonnet-5) was used for the majority of the project, including the initial benchmark and
+fine-tuning pipeline (15--16 September 2026), the LaTeX manuscript draft and majority of code commits
+(17--18 September 2026), and the subsequent methodology revisions, multi-seed replication, and final editing
+passes reported here (21--23 September 2026); Claude Opus 5 (model ID claude-opus-5) was used briefly on 17
+September 2026 for literature research on academic submission standards and authentic-writing/AI-disclosure
+norms, and for an initial draft of the statistical-analysis script, before the author reverted to Sonnet 5
+for the remainder of the project; Claude Haiku 4.5 (model ID claude-haiku-4-5-20251001) was used for
+portions of manuscript review and venue-verification research on 17--18 September 2026.
 The author (B.\,Dang) has reviewed Anthropic's terms of service and usage policies for Claude and confirms
 that these tools are suitable for use in preparing this manuscript for publication. The author directed all
 research decisions, designed and ran every experiment, independently verified every statistic, figure, and
