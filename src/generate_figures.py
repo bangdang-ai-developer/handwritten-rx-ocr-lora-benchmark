@@ -102,7 +102,7 @@ def fig3_error_taxonomy_kaggle_rx():
     models = ["trocr-large-handwritten", "trocr-lora-finetuned"]
     model_labels = ["Zero-shot", "Fine-tuned (LoRA)"]
 
-    fig, ax = plt.subplots(figsize=(8, 3.2))
+    fig, ax = plt.subplots(figsize=(8, 4.7))
     left = np.zeros(len(models))
     for cat, label, color in zip(cats, cat_labels, colors):
         vals = df.loc[cat, models].values.astype(float)
@@ -127,7 +127,7 @@ def fig4_error_taxonomy_iam():
     models = ["trocr-large-handwritten", "trocr-lora-finetuned"]
     model_labels = ["Zero-shot", "Fine-tuned (LoRA)"]
 
-    fig, ax = plt.subplots(figsize=(8, 3.2))
+    fig, ax = plt.subplots(figsize=(8, 4.7))
     left = np.zeros(len(models))
     for cat, label, color in zip(cats, cat_labels, colors):
         vals = df.loc[cat, models].values.astype(float)

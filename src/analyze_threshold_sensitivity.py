@@ -92,7 +92,7 @@ def main():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(7, 4.2))
+    fig, ax = plt.subplots(figsize=(7, 4.6))
     ax.hist(wrong["dist"], bins=40, color="#4C72B0", alpha=0.75, edgecolor="white", linewidth=0.4)
     ax.axvline(0.34, color="#C44E52", linestyle="-", linewidth=2, label="0.34 (used in the paper)")
     if knee_value is not None:
